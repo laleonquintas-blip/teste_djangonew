@@ -1,0 +1,119 @@
+/* static/css/admin_custom.css */
+
+/* ============================================================
+   1. CORREÇÃO DE LAYOUT DO FORMULÁRIO (SEU CÓDIGO ORIGINAL)
+   ============================================================ */
+
+/* Força a linha do formulário a usar Flexbox */
+.form-row {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Configura cada "caixa de campo" (Label + Input) */
+.form-row .field-box {
+    display: flex !important;
+    flex-direction: column;
+    flex: 1;
+    min-width: 200px;
+    margin-right: 20px;
+    padding-left: 0 !important;
+    float: none !important;
+}
+
+.form-row .field-box:last-child {
+    margin-right: 0;
+}
+
+/* --- ESTILO DOS LABELS (Rótulos) --- */
+.form-row .field-box label {
+    display: inline-block;
+    width: 100% !important;
+    margin-bottom: 5px;
+    font-weight: 600;
+    margin-top: 0;
+    padding: 0;
+    text-align: left;
+}
+
+/* --- ESTILO DOS INPUTS E SELECTS --- */
+.form-row select,
+.form-row input[type="text"],
+.form-row input[type="number"],
+.form-row input[type="email"],
+.form-row input[type="date"],
+.form-row .vDateField,
+.form-row .select2-container {
+    width: 100% !important;
+    height: 40px !important;
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+.select2-container .select2-selection--single {
+    height: 40px !important;
+    display: flex;
+    align-items: center;
+}
+
+.form-row > div + div:before {
+    display: none;
+}
+
+/* ============================================================
+   2. AJUSTES VISUAIS (LOGO E LOGIN) - VERSÃO FINAL
+   ============================================================ */
+
+/* --- TELA DE LOGIN --- */
+
+/* Centraliza o container da logo */
+.login-page .login-logo {
+    margin-bottom: 15px !important;
+    text-align: center !important;
+    width: 100% !important;
+}
+
+/* A Mágica acontece aqui: Controla o tamanho da imagem */
+.login-page .login-logo img {
+    /* Largura máxima reduzida para não encostar nas bordas */
+    max-width: 280px !important;
+
+    /* Limita a altura também, caso a imagem seja muito alta */
+    max-height: 120px !important;
+
+    width: auto !important;
+    height: auto !important;
+
+    /* Garante centralização */
+    display: block !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+
+    /* REMOVE QUALQUER ARREDONDAMENTO (Fim do oval) */
+    border-radius: 0 !important;
+}
+
+/* --- MENU SUPERIOR (DASHBOARD) --- */
+
+/* Ajusta a logo para ficar alinhada e não oval */
+.brand-link .brand-image {
+    max-height: 35px !important;
+    width: auto !important;
+    margin-top: 2px !important;
+    float: none !important;
+    vertical-align: middle !important;
+
+    /* Garante que a logo pequena também seja retangular */
+    border-radius: 0 !important;
+}
+
+/* --- CORREÇÃO DO TEXTO CORTADO --- */
+.brand-link .brand-text {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    vertical-align: middle !important;
+    margin-left: 8px !important;
+}

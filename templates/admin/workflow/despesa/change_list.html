@@ -1,0 +1,67 @@
+{% extends "admin/change_list.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block content_title %}
+    <h1> Fluxo de Aprovação de Despesas </h1>
+{% endblock %}
+
+{# --- BOTÕES DE AÇÃO --- #}
+{% block object-tools %}
+    <ul class="object-tools" style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
+        <li>
+            <a href="add/?tipo=CAIXINHA" class="btn" style="background-color: #28a745; color: white !important; font-weight: bold; min-width: 220px; text-align: center; padding: 10px;">
+                <i class="fas fa-plus-circle"></i> Adicionar Caixinha
+            </a>
+        </li>
+        <li>
+            <a href="add/?tipo=SOLICITACAO" class="btn" style="background-color: #17a2b8; color: white !important; font-weight: bold; min-width: 220px; text-align: center; padding: 10px;">
+                <i class="fas fa-file-signature"></i> Adicionar Solicitação
+            </a>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block result_list %}
+
+{# --- ESTILO DOS CARDS --- #}
+<style>
+    .dashboard-cards { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 25px; margin-top: 10px; }
+    .card-link { text-decoration: none; color: inherit; flex: 1 1 200px; max-width: 250px; min-width: 180px; }
+    .card-box { background-color: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 15px; border-left: 6px solid #ccc; height: 100%; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.3s ease;}
+    .card-box:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+    .card-title { font-size: 13px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 10px; }
+    .card-content { display: flex; justify-content: space-between; align-items: flex-end; }
+    .card-value { font-size: 16px; font-weight: bold; color: #333; }
+    .card-qtd-box { text-align: right; }
+    .card-qtd-label { font-size: 10px; color: #999; display: block; }
+    .card-qtd-num { font-size: 20px; font-weight: 800; line-height: 1; }
+</style>
+
+<div class="dashboard-cards">
+    {% for card in summary_data %}
+    <a href="?status__exact={{ card.status_key }}" class="card-link">
+        <div class="card-box" style="border-left-color: {{ card.color }};">
+            <div class="card-title" style="color: {{ card.color }};">
+                {{ card.status_label }}
+            </div>
+            <div class="card-content">
+                <div class="card-value">
+                    <small style="color:#aaa; font-weight:normal;">R$</small>
+                    {{ card.total_valor|default:0|intcomma }}
+                </div>
+                <div class="card-qtd-box">
+                    <span class="card-qtd-label">Qtd</span>
+                    <span class="card-qtd-num" style="color: {{ card.color }};">
+                        {{ card.total_qtd }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{{ block.super }}
+
+{% endblock %}

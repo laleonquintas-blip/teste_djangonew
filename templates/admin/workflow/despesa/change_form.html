@@ -1,0 +1,166 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+    {{ block.super }}
+
+    <style>
+        /* ============================================================
+           CSS "NUCLEAR" V7 - GRID + VISIBILIDADE + MOBILE PRO
+           ============================================================ */
+
+        /* --- 1. CONFIGURAÇÃO GERAL (DESKTOP) --- */
+        .form-row {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr; /* 2 colunas */
+            gap: 20px;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            border-bottom: none !important;
+            margin-bottom: 15px !important;
+        }
+
+        .form-row .field-box:only-child { grid-column: 1 / -1 !important; }
+
+        .form-row .field-box {
+            width: 100% !important; margin: 0 !important; padding: 0 !important;
+            display: flex !important; flex-direction: column !important; float: none !important;
+        }
+
+        .force-hide { display: none !important; }
+
+        .form-row .field-box label {
+            display: block !important; width: 100% !important; margin-bottom: 6px !important;
+            font-weight: 700 !important; color: #333;
+        }
+
+        /* --- 2. INPUTS PADRONIZADOS --- */
+        .form-row input[type="text"], .form-row input[type="number"],
+        .form-row input[type="date"], .form-row input[type="email"],
+        .form-row textarea, .form-row select, .vDateField, .vTimeField {
+            width: 100% !important; height: 40px !important;
+            box-sizing: border-box !important; border: 1px solid #ced4da !important;
+            border-radius: 4px !important; padding: 6px 12px !important;
+            font-size: 14px !important; background-color: #fff;
+        }
+        .form-row textarea { height: auto !important; min-height: 40px; }
+
+        /* SELECT2 E READONLY */
+        .select2-container { width: 100% !important; display: block !important; }
+        .select2-container .select2-selection--single {
+            height: 40px !important; border: 1px solid #ced4da !important; border-radius: 4px !important;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 38px !important; padding-left: 12px !important;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 38px !important; top: 1px !important;
+        }
+
+        .form-row .field-box .readonly {
+            display: flex !important; align-items: center !important;
+            width: 100% !important; min-height: 40px !important;
+            padding: 0 12px !important; box-sizing: border-box !important;
+            border: 1px solid #ced4da !important; background-color: #e9ecef !important;
+            border-radius: 4px !important; color: #495057 !important;
+        }
+        .form-row .field-box .readonly p { margin: 0 !important; }
+        .form-row > div + div:before { display: none !important; }
+
+        /* ============================================================
+           --- 3. MOBILE PRO (A MÁGICA ACONTECE AQUI) ---
+           Aplica regras apenas se a tela for menor que 768px (Celulares/Tablets)
+           ============================================================ */
+        @media (max-width: 768px) {
+
+            /* Transforma tudo em 1 coluna */
+            .form-row {
+                grid-template-columns: 1fr !important;
+                gap: 15px !important;
+            }
+
+            /* Aumenta inputs para facilitar o toque (Dedo gordo friendly) */
+            .form-row input[type="text"], .form-row input[type="number"],
+            .form-row select, .select2-container .select2-selection--single,
+            .form-row .field-box .readonly {
+                height: 45px !important; /* Mais alto */
+                font-size: 16px !important; /* Tamanho legível */
+            }
+
+            /* Ajusta altura da linha do texto do select2 */
+            .select2-container--default .select2-selection--single .select2-selection__rendered {
+                line-height: 43px !important;
+            }
+            .select2-container--default .select2-selection--single .select2-selection__arrow {
+                height: 43px !important;
+            }
+
+            /* Melhora a barra de botões "Salvar" lá embaixo */
+            .submit-row {
+                display: flex !important;
+                flex-direction: column-reverse !important; /* Inverte ordem (Salvar no topo) ou empilha */
+                gap: 10px !important;
+                padding: 10px !important;
+            }
+
+            /* Botões ocupam 100% da largura no celular */
+            .submit-row input {
+                width: 100% !important;
+                margin: 0 !important;
+                height: 50px !important; /* Botão bem grande */
+                font-size: 16px !important;
+            }
+
+            /* Esconde botões menos úteis no mobile se quiser limpar a tela */
+            /* .submit-row input[name="_addanother"] { display: none !important; } */
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+
+            // CONFIGURAÇÕES
+            const ID_STATUS = 'id_status';
+            const CLASSE_LINHA_OPERADOR = 'field-operador';
+            const VALOR_GATILHO_OPERADOR = 'DIRECIONADO_OP';
+            const STATUS_PROIBIDOS = ['RASCUNHO']; // Lista negra
+
+            // 1. VISIBILIDADE CAMPO OPERADOR
+            function verificarVisualizacao() {
+                var campoStatus = document.getElementById(ID_STATUS);
+                if (!campoStatus) campoStatus = document.querySelector('select[name="status"]');
+                var linhaOperador = document.getElementsByClassName(CLASSE_LINHA_OPERADOR)[0];
+
+                if (!campoStatus || !linhaOperador) return;
+
+                if (campoStatus.value === VALOR_GATILHO_OPERADOR) {
+                    linhaOperador.classList.remove('force-hide');
+                } else {
+                    linhaOperador.classList.add('force-hide');
+                }
+            }
+
+            // 2. LIMPEZA DE OPÇÕES
+            function limparStatusIndesejados() {
+                var campoStatus = document.getElementById(ID_STATUS);
+                if (!campoStatus) campoStatus = document.querySelector('select[name="status"]');
+
+                if (campoStatus && campoStatus.options) {
+                    for (var i = campoStatus.options.length - 1; i >= 0; i--) {
+                        var valorOpcao = campoStatus.options[i].value;
+                        if (STATUS_PROIBIDOS.includes(valorOpcao)) {
+                            if (campoStatus.value !== valorOpcao) {
+                                campoStatus.remove(i);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- EXECUÇÃO ---
+            limparStatusIndesejados();
+            setInterval(function() { verificarVisualizacao(); }, 300);
+            verificarVisualizacao();
+        });
+    </script>
+{% endblock %}
