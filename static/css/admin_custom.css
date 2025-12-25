@@ -1,119 +1,90 @@
-/* static/css/admin_custom.css */
+/* static/css/admin_custom.css - VERSÃO FINAL AJUSTADA */
 
 /* ============================================================
-   1. CORREÇÃO DE LAYOUT DO FORMULÁRIO (SEU CÓDIGO ORIGINAL)
+   1. GHOST BUSTER (MATAR O CAMPO FANTASMA)
    ============================================================ */
-
-/* Força a linha do formulário a usar Flexbox */
-.form-row {
-    display: flex !important;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-/* Configura cada "caixa de campo" (Label + Input) */
-.form-row .field-box {
-    display: flex !important;
-    flex-direction: column;
-    flex: 1;
-    min-width: 200px;
-    margin-right: 20px;
-    padding-left: 0 !important;
-    float: none !important;
-}
-
-.form-row .field-box:last-child {
-    margin-right: 0;
-}
-
-/* --- ESTILO DOS LABELS (Rótulos) --- */
-.form-row .field-box label {
-    display: inline-block;
-    width: 100% !important;
-    margin-bottom: 5px;
-    font-weight: 600;
-    margin-top: 0;
-    padding: 0;
-    text-align: left;
-}
-
-/* --- ESTILO DOS INPUTS E SELECTS --- */
-.form-row select,
-.form-row input[type="text"],
-.form-row input[type="number"],
-.form-row input[type="email"],
-.form-row input[type="date"],
-.form-row .vDateField,
-.form-row .select2-container {
-    width: 100% !important;
-    height: 40px !important;
-    box-sizing: border-box;
-    max-width: 100%;
-}
-
-.select2-container .select2-selection--single {
-    height: 40px !important;
-    display: flex;
-    align-items: center;
-}
-
-.form-row > div + div:before {
-    display: none;
+/* Esconde o input de busca duplicado na lateral.
+   Adicionamos height:0 e border:none para garantir que nem a
+   borda branca apareça.
+*/
+#changelist-filter input[name="q"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    opacity: 0 !important;
 }
 
 /* ============================================================
-   2. AJUSTES VISUAIS (LOGO E LOGIN) - VERSÃO FINAL
+   2. REMOVER O BOTÃO 'PESQUISAR' DUPLICADO (RODAPÉ)
    ============================================================ */
+/* O segredo: Usamos o seletor ">" para pegar apenas o botão que está
+   solto na div do formulário, SEM atingir o botão que está dentro
+   do controle de data (.admindatefilter).
+*/
+#changelist-filter form > div > input[type="submit"] {
+    display: none !important;
+}
 
-/* --- TELA DE LOGIN --- */
-
-/* Centraliza o container da logo */
-.login-page .login-logo {
+/* ============================================================
+   3. ESTILIZAÇÃO DOS BOTÕES DO FILTRO DE DATA (TOPO)
+   ============================================================ */
+/* Garante o layout lado a lado */
+.admindatefilter .controls {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    gap: 5px !important;
     margin-bottom: 15px !important;
-    text-align: center !important;
-    width: 100% !important;
+    padding-top: 5px !important;
 }
 
-/* A Mágica acontece aqui: Controla o tamanho da imagem */
-.login-page .login-logo img {
-    /* Largura máxima reduzida para não encostar nas bordas */
-    max-width: 280px !important;
-
-    /* Limita a altura também, caso a imagem seja muito alta */
-    max-height: 120px !important;
-
-    width: auto !important;
-    height: auto !important;
-
-    /* Garante centralização */
+/* Botão PESQUISAR (Do plugin de data) -> AZUL */
+.admindatefilter .controls input[type="submit"],
+.admindatefilter .controls button {
     display: block !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-
-    /* REMOVE QUALQUER ARREDONDAMENTO (Fim do oval) */
-    border-radius: 0 !important;
+    visibility: visible !important; /* Força visibilidade caso algo tenha escondido */
+    flex: 1 !important;
+    background-color: #007bff !important; /* Azul */
+    color: white !important;
+    border: none !important;
+    padding: 8px 0 !important;
+    border-radius: 4px !important;
+    font-weight: bold !important;
+    font-size: 11px !important;
+    cursor: pointer !important;
+    text-transform: uppercase !important;
+    height: auto !important;
+    margin: 0 !important;
+    line-height: normal !important;
 }
 
-/* --- MENU SUPERIOR (DASHBOARD) --- */
-
-/* Ajusta a logo para ficar alinhada e não oval */
-.brand-link .brand-image {
-    max-height: 35px !important;
-    width: auto !important;
-    margin-top: 2px !important;
-    float: none !important;
-    vertical-align: middle !important;
-
-    /* Garante que a logo pequena também seja retangular */
-    border-radius: 0 !important;
+/* Botão LIMPAR (Do plugin de data) -> AZUL TURQUESA */
+.admindatefilter .controls a {
+    display: block !important;
+    visibility: visible !important;
+    flex: 1 !important;
+    background-color: #17a2b8 !important; /* Azul Turquesa */
+    color: white !important;
+    text-align: center !important;
+    padding: 8px 0 !important;
+    border-radius: 4px !important;
+    font-weight: bold !important;
+    font-size: 11px !important;
+    text-decoration: none !important;
+    text-transform: uppercase !important;
+    margin: 0 !important;
+    line-height: normal !important;
 }
 
-/* --- CORREÇÃO DO TEXTO CORTADO --- */
-.brand-link .brand-text {
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    vertical-align: middle !important;
-    margin-left: 8px !important;
-}
+/* Efeitos Hover */
+.admindatefilter .controls input[type="submit"]:hover { background-color: #0056b3 !important; }
+.admindatefilter .controls a:hover { background-color: #117a8b !important; }
+
+/* ============================================================
+   4. TELA DE LOGIN (MANTIDO)
+   ============================================================ */
+.login-page .login-logo { max-width: 350px !important; margin: 0 auto 15px auto !important; }

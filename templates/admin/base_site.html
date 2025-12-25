@@ -1,0 +1,75 @@
+{% extends "admin/base.html" %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style type="text/css">
+    /* =========================================================
+       CSS DEFINITIVO (INJETADO NO HTML)
+       ========================================================= */
+
+    /* 1. MATAR O CAMPO FANTASMA (INPUT DE TEXTO)
+       Esconde qualquer input chamado 'q' na barra lateral. */
+    #changelist-filter input[name="q"] {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        margin: 0 !important;
+    }
+
+    /* 2. REGRA GERAL: ESCONDER TODOS OS BOTÕES DE SUBMIT NA BARRA LATERAL
+       Isso garante que o botão "duplicado" (marcado com X) suma. */
+    #changelist-filter input[type="submit"] {
+        display: none !important;
+    }
+
+    /* 3. EXCEÇÃO: TRAZER DE VOLTA O BOTÃO DO FILTRO DE DATA
+       Aqui sobrescrevemos a regra 2 APENAS para o botão que está
+       dentro da classe .admindatefilter (o plugin de data). */
+    .admindatefilter .controls input[type="submit"],
+    .admindatefilter .controls button {
+        display: block !important;
+        width: 100% !important;
+        background-color: #007bff !important; /* Azul */
+        color: white !important;
+        border: none !important;
+        padding: 8px !important;
+        border-radius: 4px !important;
+        font-weight: bold !important;
+        cursor: pointer !important;
+        text-transform: uppercase !important;
+        margin-top: 5px !important;
+        visibility: visible !important;
+    }
+
+    /* 4. ESTILIZAR O LINK 'LIMPAR'
+       Deixa ele com cara de botão azul turquesa. */
+    .admindatefilter .controls a {
+        display: block !important;
+        width: 100% !important;
+        text-align: center !important;
+        background-color: #17a2b8 !important; /* Azul Turquesa */
+        color: white !important;
+        padding: 8px !important;
+        border-radius: 4px !important;
+        text-decoration: none !important;
+        font-weight: bold !important;
+        font-size: 11px !important;
+        margin-top: 5px !important;
+        visibility: visible !important;
+    }
+
+    /* 5. ARRUMAR LAYOUT DOS BOTÕES
+       Garante que fiquem alinhados e visíveis. */
+    .admindatefilter .controls {
+        display: block !important;
+        padding-bottom: 10px !important;
+    }
+
+    /* Efeitos de Hover (Passar o mouse) */
+    .admindatefilter .controls input[type="submit"]:hover { background-color: #0056b3 !important; }
+    .admindatefilter .controls a:hover { background-color: #117a8b !important; }
+
+</style>
+{% endblock %}

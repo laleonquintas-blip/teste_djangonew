@@ -2,9 +2,10 @@
 
 from django.db import models
 from django.contrib import messages
-from datetime import date # <--- (NOVO) Importação para pegar a data de hoje
+from datetime import date
+from django.utils.html import format_html  # <--- (NOVO) Para as cores no Admin
 from cadastros.models import Cliente, Fornecedor, Empresa, Banco, TipoServico
-from core.models import UsuarioCustomizado  # Import único para o usuário
+from core.models import UsuarioCustomizado
 
 # --- CHOICES (Opções Fixas) ---
 STATUS_PAGAMENTO_CHOICES = [
@@ -52,6 +53,42 @@ class ContasAPagar(models.Model):
     usuario_baixa = models.ForeignKey(UsuarioCustomizado, on_delete=models.SET_NULL, null=True, blank=True,
                                       verbose_name="Usuário da Baixa")
 
+    # --- (NOVO) LÓGICA VISUAL DE CORES PARA O ADMIN ---
+    def status_visual(self):
+        hoje = date.today()
+
+        # 1. Se já está pago ou cancelado (Status Definitivo)
+        if self.status == 'PAGO':
+            cor = '#28a745'  # Verde
+            texto = 'PAGO'
+        elif self.status == 'CANCELADO':
+            cor = '#6c757d'  # Cinza
+            texto = 'CANCELADO'
+
+        # 2. Se está Pendente, calculamos a data
+        else:
+            if self.vencimento < hoje:
+                # Vencido
+                dias = (hoje - self.vencimento).days
+                cor = '#dc3545'  # Vermelho
+                texto = f'VENCIDO ({dias} dias)'
+            elif self.vencimento == hoje:
+                # Vence Hoje
+                cor = '#ffc107; color: black'  # Amarelo/Laranja
+                texto = 'VENCE HOJE'
+            else:
+                # A Vencer
+                cor = '#17a2b8'  # Azul
+                texto = 'A VENCER'
+
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; white-space: nowrap;">{}</span>',
+            cor, texto
+        )
+
+    status_visual.short_description = "Situação"  # Nome da coluna no Admin
+    status_visual.admin_order_field = 'vencimento'  # Permite ordenar pela data clicando na coluna
+
     def save(self, request=None, *args, **kwargs):
         # 1. Gera Nota se não existir
         if not self.nota:
@@ -65,8 +102,7 @@ class ContasAPagar(models.Model):
             if request:
                 messages.success(request, f"SUCESSO! Conta a Pagar criada: {self.nota}")
 
-        # 2. (NOVO) LÓGICA DA DATA AUTOMÁTICA
-        # Se mudou para PAGO e a data está vazia, preenche com HOJE
+        # 2. LÓGICA DA DATA AUTOMÁTICA
         if self.status == 'PAGO' and not self.data_baixa:
             self.data_baixa = date.today()
 
@@ -101,6 +137,36 @@ class ContasAReceber(models.Model):
     usuario_baixa = models.ForeignKey(UsuarioCustomizado, on_delete=models.SET_NULL, null=True, blank=True,
                                       verbose_name="Usuário da Baixa")
 
+    # --- (NOVO) LÓGICA VISUAL DE CORES PARA O ADMIN ---
+    def status_visual(self):
+        hoje = date.today()
+
+        if self.status == 'PAGO':
+            cor = '#28a745'  # Verde
+            texto = 'RECEBIDO'
+        elif self.status == 'CANCELADO':
+            cor = '#6c757d'  # Cinza
+            texto = 'CANCELADO'
+        else:
+            if self.vencimento < hoje:
+                dias = (hoje - self.vencimento).days
+                cor = '#dc3545'  # Vermelho
+                texto = f'VENCIDO ({dias} dias)'
+            elif self.vencimento == hoje:
+                cor = '#ffc107; color: black'  # Amarelo
+                texto = 'VENCE HOJE'
+            else:
+                cor = '#17a2b8'  # Azul
+                texto = 'A VENCER'
+
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; white-space: nowrap;">{}</span>',
+            cor, texto
+        )
+
+    status_visual.short_description = "Situação"
+    status_visual.admin_order_field = 'vencimento'
+
     def save(self, request=None, *args, **kwargs):
         # 1. Gera Nota se não existir
         if not self.nota:
@@ -114,7 +180,7 @@ class ContasAReceber(models.Model):
             if request:
                 messages.success(request, f"SUCESSO! Conta a Receber criada: {self.nota}")
 
-        # 2. (NOVO) LÓGICA DA DATA AUTOMÁTICA
+        # 2. LÓGICA DA DATA AUTOMÁTICA
         if self.status == 'PAGO' and not self.data_baixa:
             self.data_baixa = date.today()
 
