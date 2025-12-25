@@ -56,7 +56,7 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
     list_display = ('nota', 'fornecedor', 'vencimento', 'valor', 'status_visual', 'data_baixa', 'usuario_baixa')
 
     # ATIVE A BUSCA NOVAMENTE (O CSS vai esconder o duplicado da lateral)
-    search_fields = ('nota', 'fornecedor__razao_social')
+    # search_fields = ('nota', 'fornecedor__razao_social')
 
     list_filter = (
         StatusFilter,

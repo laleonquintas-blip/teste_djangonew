@@ -107,7 +107,7 @@ JAZZMIN_SETTINGS = {
     "site_logo_classes": "img-fluid",
     "welcome_sign": "Acesso do Colaborador Malupe",
     "copyright": "Malupe Ltda",
-    "search_model": ["financeiro.ContasAPagar", "cadastros.Cliente"],
+    "search_model": ["cadastros.Cliente"],
 
     # Mantemos aqui, mas o que vai valer mesmo é o CSS no HTML
     "custom_css": "css/admin_custom.css",

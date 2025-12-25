@@ -1,0 +1,42 @@
+/* static/css/admin_fixes.css */
+
+/* 1. Transforma a linha do formulário em um container Flex (Flexbox) */
+.form-row {
+    display: flex !important;
+    flex-wrap: wrap; /* Permite quebrar linha em telas pequenas */
+    align-items: flex-start; /* Alinha tudo no topo */
+    width: 100%;
+}
+
+/* 2. Configura cada caixa de campo (field-box) para crescer igualmente */
+.form-row .field-box {
+    flex: 1; /* Faz os campos ocuparem o mesmo espaço (50%/50% se forem dois) */
+    min-width: 200px; /* Evita que fiquem muito espremidos */
+    margin-right: 20px; /* Espaço entre o campo da esquerda e o da direita */
+    display: block; /* Garante que label fique em cima e input embaixo */
+}
+
+/* Remove a margem do último item para não desalinhar a direita */
+.form-row .field-box:last-child {
+    margin-right: 0;
+}
+
+/* 3. Força os inputs e selects a ocuparem 100% da largura da caixa deles */
+.form-row .field-box select,
+.form-row .field-box input[type="text"],
+.form-row .field-box input[type="number"],
+.form-row .field-box input[type="email"],
+.form-row .field-box textarea,
+.form-row .field-box .vDateField,
+.form-row .field-box .vTimeField {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box; /* Garante que a borda não aumente a largura */
+}
+
+/* 4. Ajuste específico para datas (que as vezes ficam pequenas) */
+.datetimeshortcuts {
+    display: block; /* Joga o link "Hoje | Calendário" para baixo do input */
+    margin-top: 5px;
+    color: #3498db;
+}

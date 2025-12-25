@@ -28,7 +28,13 @@ class DespesaForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        # Campo Oculto de Tipo
+        # 1. AUTO-PREENCHIMENTO DO SOLICITANTE
+        if not self.instance.pk and self.request:
+            self.fields['solicitante'].initial = self.request.user
+            self.fields['solicitante'].disabled = True
+            self.fields['solicitante'].help_text = "Definido automaticamente como o usuário logado."
+
+        # 2. CAMPO OCULTO DE TIPO
         tipo_real = None
         if self.instance.pk:
             tipo_real = self.instance.tipo_lancamento
@@ -39,7 +45,7 @@ class DespesaForm(forms.ModelForm):
             self.fields['tipo_reserva'].initial = tipo_real
             self.instance.tipo_lancamento = tipo_real
 
-        # Filtro de Operadores
+        # 3. FILTRO DE OPERADORES
         if 'operador' in self.fields:
             try:
                 grupo_op = Group.objects.get(name='Operador')
@@ -47,7 +53,7 @@ class DespesaForm(forms.ModelForm):
             except Group.DoesNotExist:
                 pass
 
-        # Filtro de Status Dinâmico
+        # 4. FILTRO DE STATUS
         if self.request and 'status' in self.fields:
             user = self.request.user
             if not user.is_superuser:
@@ -77,7 +83,7 @@ class DespesaForm(forms.ModelForm):
                     (k, v) for k, v in todas_opcoes if k in status_permitidos
                 ]
 
-        # Campos Opcionais
+        # 5. CAMPOS OPCIONAIS
         campos_livres = [
             'data_despesa', 'fornecedor', 'valor', 'observacoes',
             'solicitante', 'status', 'tipo_lancamento', 'operador',
@@ -98,20 +104,29 @@ class DespesaForm(forms.ModelForm):
         self.instance.tipo_lancamento = tipo
         cleaned_data['tipo_lancamento'] = tipo
 
+        if not self.instance.pk and self.request:
+            cleaned_data['solicitante'] = self.request.user
+            self.instance.solicitante = self.request.user
+
         if self.instance.pk:
-            protegidos = ['data_despesa', 'fornecedor', 'valor', 'solicitante']
+            protegidos = [
+                'data_despesa', 'fornecedor', 'valor', 'solicitante',
+                'nome_cobriu', 'forma_pagamento', 'dados_bancarios_pagto'
+            ]
 
             user = self.request.user if hasattr(self, 'request') else None
             is_admin_group = user and user.groups.filter(name='Administrativo').exists()
             is_extra_inicial = self.instance.tipo_lancamento == 'EXTRA' and self.instance.status == 'AGUARDANDO_ADM'
 
             if is_extra_inicial and is_admin_group:
-                if 'valor' in protegidos: protegidos.remove('valor')
+                campos_editaveis_adm = ['valor', 'nome_cobriu', 'forma_pagamento', 'dados_bancarios_pagto']
+                for c in campos_editaveis_adm:
+                    if c in protegidos: protegidos.remove(c)
 
             for campo in protegidos:
                 if not cleaned_data.get(campo):
                     original = getattr(self.instance, campo)
-                    if original is not None:
+                    if original is not None and original != '':
                         cleaned_data[campo] = original
                         if campo in self._errors: del self._errors[campo]
 
@@ -146,7 +161,11 @@ class DespesaAdmin(admin.ModelAdmin):
     change_form_template = "admin/workflow/despesa/change_form.html"
 
     class Media:
-       js = ('js/admin_despesa.js',)
+        js = ('js/admin_despesa.js',)
+
+        css = {
+            'all': ('css/admin_fixes.css',)
+        }
 
     list_display = ('id', 'tipo_badge', 'solicitante', 'fornecedor', 'valor_formatado', 'status_badge',
                     'botao_detalhes')
@@ -161,9 +180,17 @@ class DespesaAdmin(admin.ModelAdmin):
     }
 
     def get_form(self, request, obj=None, **kwargs):
-        FormClass = super().get_form(request, obj, **kwargs)
+        # 1. SOLUÇÃO DEFINITIVA PARA REMOVER ÍCONES E ALINHAR
+        form = super().get_form(request, obj, **kwargs)
+        for field in form.base_fields.values():
+            if hasattr(field.widget, 'can_add_related'):
+                field.widget.can_add_related = False
+                field.widget.can_change_related = False
+                field.widget.can_delete_related = False
+                field.widget.can_view_related = False
 
-        class RequestDespesaForm(FormClass):
+        # 2. Classe Wrapper para injeção de request (necessário para seu filtro de usuário)
+        class RequestDespesaForm(form):
             def __init__(self, *args, **kwargs):
                 kwargs['request'] = request
                 super().__init__(*args, **kwargs)
@@ -198,13 +225,10 @@ class DespesaAdmin(admin.ModelAdmin):
             if not self.has_change_permission(request, obj):
                 return [f.name for f in self.model._meta.fields]
 
-            # REGRA ADM EXTRA: Trava metadados, mas deixa Valor/Pagto livres
             if obj.tipo_lancamento == 'EXTRA' and obj.status == 'AGUARDANDO_ADM' and 'Administrativo' in grupos:
-                # O que o ADM *NÃO* pode mexer:
                 ro_fields.extend(['solicitante', 'fornecedor', 'data_despesa', 'observacoes', 'tomador', 'filial'])
                 return ro_fields
 
-            # REGRA PADRÃO
             campos_travados_padrao = [
                 'solicitante', 'data_despesa', 'fornecedor', 'valor', 'observacoes',
                 'comprovante', 'inicio_cobertura', 'fim_cobertura', 'tomador', 'filial',
@@ -218,9 +242,8 @@ class DespesaAdmin(admin.ModelAdmin):
 
         return ro_fields
 
-    # --- FIELDSETS (LAYOUT CORRIGIDO) ---
+    # --- FIELDSETS ---
     def get_fieldsets(self, request, obj=None):
-        # 1. Bloco Principal
         fieldsets = [
             ('Dados do Lançamento', {
                 'fields': (
@@ -235,8 +258,6 @@ class DespesaAdmin(admin.ModelAdmin):
             }),
         ]
 
-        # 2. Bloco Extra (Pagamento Adm) - AJUSTE AQUI
-        # Usamos tuplas individuais (campo,) para forçar uma linha por campo.
         if obj and obj.tipo_lancamento == 'EXTRA':
             fieldsets.append(('Definição de Pagamento (Administrativo)', {
                 'fields': (
@@ -246,14 +267,20 @@ class DespesaAdmin(admin.ModelAdmin):
                 )
             }))
 
-        # 3. Bloco de Aprovação
         user = request.user
         grupos = list(user.groups.values_list('name', flat=True))
         is_aprovador = any(g in grupos for g in ['Aprovador Financeiro', 'Aprovador RH', 'Operador', 'Administrativo'])
 
         if user.is_superuser or is_aprovador:
+            campos_aprovacao = ['status', 'operador']
+            if user.is_superuser or 'Aprovador Financeiro' in grupos or 'Operador' in grupos:
+                campos_aprovacao.extend(['empresa_pagadora', 'banco_pagador'])
+
+            campos_aprovacao.append('motivo_cancelamento')
+
             fieldsets.append(('Aprovação / Execução', {
-                'fields': ('status', 'operador', 'empresa_pagadora', 'banco_pagador', 'motivo_cancelamento')}))
+                'fields': tuple(campos_aprovacao)
+            }))
 
         return fieldsets
 
@@ -265,7 +292,6 @@ class DespesaAdmin(admin.ModelAdmin):
 
         grupos = list(user.groups.values_list('name', flat=True))
 
-        # Administrativo: Pode editar se for Extra e estiver na fase dele
         if 'Administrativo' in grupos and obj.status == 'AGUARDANDO_ADM':
             if obj.solicitante == user: return True
 
@@ -283,11 +309,13 @@ class DespesaAdmin(admin.ModelAdmin):
 
     # --- HELPERS ---
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        # AQUI FICA APENAS A LÓGICA DE FILTRO (SEM CÓDIGO VISUAL)
         if db_field.name == "fornecedor":
             user = request.user
             if not user.is_superuser and hasattr(user, 'acesso_despesa') and user.acesso_despesa:
                 letras = [l.strip() for l in user.acesso_despesa.split(',')]
                 kwargs["queryset"] = db_field.related_model.objects.filter(letra_acesso__in=letras)
+
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):

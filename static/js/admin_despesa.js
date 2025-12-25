@@ -1,13 +1,9 @@
-/* static/js/admin_despesa.js */
+/* static/js/admin_despesa.js - VERSÃO BLINDADA */
 document.addEventListener('DOMContentLoaded', function() {
     const $ = django.jQuery;
 
     // --- 1. DEFINIÇÃO DOS GRUPOS DE CAMPOS ---
-
-    // Campos exclusivos de Caixinha
     const camposCaixinha = ['.field-comprovante'];
-
-    // Campos usados em Solicitação e EXTRA (Operacionais + Pagamento)
     const camposGerais = [
         '.field-inicio_cobertura', '.field-fim_cobertura',
         '.field-tomador', '.field-filial',
@@ -17,53 +13,57 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
 
     function toggleFields() {
-        // --- 2. DETECÇÃO DO TIPO ATUAL ---
+        // --- 2. DETECÇÃO DO TIPO ATUAL (AGORA MAIS INTELIGENTE) ---
+        let selectedType = null;
 
-        // Tenta pegar da URL (quando cria novo: ?tipo=EXTRA)
-        const urlParams = new URLSearchParams(window.location.search);
-        let selectedType = urlParams.get('tipo');
-
-        // Se não tem na URL, tenta pegar da tela (Edição/Visualização)
-        if (!selectedType) {
-            // Tenta ler o texto do campo readonly (Ex: "Tipo: Extra")
-            const fieldText = $('.field-tipo_lancamento .readonly').text().trim().toUpperCase();
-
-            if (fieldText.includes('CAIXINHA')) {
-                selectedType = 'CAIXINHA';
-            } else if (fieldText.includes('SOLICITAÇÃO') || fieldText.includes('SOLICITACAO')) {
-                selectedType = 'SOLICITACAO';
-            } else if (fieldText.includes('EXTRA')) {
-                selectedType = 'EXTRA'; // <--- AQUI ESTAVA FALTANDO ANTES
-            } else {
-                // Última tentativa: pega do input (caso seja editável)
-                selectedType = $('#id_tipo_lancamento').val();
-            }
+        // TENTATIVA 1: Pegar do campo oculto de segurança (Melhor método)
+        // No Python definimos: self.fields['tipo_reserva'].initial = tipo_real
+        const hiddenInput = $('#id_tipo_reserva').val();
+        if (hiddenInput) {
+            selectedType = hiddenInput.toUpperCase();
         }
 
-        console.log("Admin JS - Tipo detectado:", selectedType);
+        // TENTATIVA 2: Pegar da URL (Quando está criando novo)
+        if (!selectedType) {
+            const urlParams = new URLSearchParams(window.location.search);
+            selectedType = urlParams.get('tipo');
+        }
+
+        // TENTATIVA 3: Pegar do select box (Se for editável)
+        if (!selectedType) {
+             selectedType = $('#id_tipo_lancamento').val();
+        }
+
+        // TENTATIVA 4: Ler o texto da tela (Último recurso, para campos Read-Only)
+        if (!selectedType) {
+            const fieldText = $('.field-tipo_lancamento .readonly').text().trim().toUpperCase();
+            if (fieldText.includes('CAIXINHA')) selectedType = 'CAIXINHA';
+            else if (fieldText.includes('SOLICITA')) selectedType = 'SOLICITACAO'; // Pega Solicitação e Solicitacao
+            else if (fieldText.includes('EXTRA')) selectedType = 'EXTRA';
+        }
+
+        console.log("Admin JS - Tipo Final Detectado:", selectedType);
 
         // --- 3. LÓGICA DE EXIBIÇÃO ---
-
         if (selectedType === 'SOLICITACAO' || selectedType === 'EXTRA') {
-            // EXTRA e SOLICITAÇÃO mostram os dados operacionais e de pagamento
             camposGerais.forEach(function(cls) { $(cls).show(); });
             camposCaixinha.forEach(function(cls) { $(cls).hide(); });
         }
         else if (selectedType === 'CAIXINHA') {
-            // CAIXINHA mostra comprovante e esconde o resto
             camposCaixinha.forEach(function(cls) { $(cls).show(); });
             camposGerais.forEach(function(cls) { $(cls).hide(); });
         }
         else {
-            // Se não identificou (ou vazio), esconde os específicos para limpar a tela
-            camposCaixinha.forEach(function(cls) { $(cls).hide(); });
-            camposGerais.forEach(function(cls) { $(cls).hide(); });
+            // Se não achou nada, não esconde tudo. Mostra tudo por segurança ou mantém estado inicial.
+            // Para evitar tela branca em caso de erro, vamos comentar o hide() total:
+            // camposCaixinha.forEach(function(cls) { $(cls).hide(); });
+            // camposGerais.forEach(function(cls) { $(cls).hide(); });
         }
     }
 
-    // Executa ao carregar a página
+    // Executa ao carregar
     toggleFields();
 
-    // Executa se o usuário mudar o tipo manualmente (se o campo estiver habilitado)
+    // Executa se mudar o select
     $('#id_tipo_lancamento').change(toggleFields);
 });
