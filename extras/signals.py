@@ -10,11 +10,11 @@ from cadastros.models import Fornecedor, Cliente
 
 @receiver(post_save, sender=LancamentoExtra)
 def automacao_extras(sender, instance, created, **kwargs):
-    # 1. CLIENTE GENÉRICO
+    # 1. CLIENTE GENÉRICO — lookup por cnpj_cpf (campo unique) para evitar IntegrityError
     cliente_padrao, _ = Cliente.objects.get_or_create(
-        razao_social="CLIENTE EXTRA (AUTO)",
+        cnpj_cpf='00000000000',
         defaults={
-            'cnpj_cpf': '00000000000',
+            'razao_social': 'CLIENTE EXTRA (AUTO)',
             'dia_vencimento': 1,
             'valor_contrato': 0.00,
             'ativo': True,
@@ -22,9 +22,10 @@ def automacao_extras(sender, instance, created, **kwargs):
         }
     )
 
-    # 2. CONTAS A RECEBER
-    novo_cr, cr_created = ContasAReceber.objects.update_or_create(
-        nota=f"EXTRA-{instance.nota_fiscal}",
+    # 2. CONTAS A RECEBER — não sobrescreve o status se já estiver PAGO
+    nota_cr = f"EXTRA-{instance.nota_fiscal}"
+    novo_cr, cr_created = ContasAReceber.objects.get_or_create(
+        nota=nota_cr,
         defaults={
             'cliente': cliente_padrao,
             'empresa_prestadora': instance.empresa_prestadora,
@@ -36,11 +37,20 @@ def automacao_extras(sender, instance, created, **kwargs):
             'status': 'PENDENTE'
         }
     )
+    if not cr_created:
+        # Atualiza apenas dados financeiros/operacionais, preserva status atual
+        novo_cr.empresa_prestadora = instance.empresa_prestadora
+        novo_cr.banco = instance.banco_recebimento
+        novo_cr.vencimento = instance.data_vencimento
+        novo_cr.valor = instance.valor_recebimento
+        novo_cr.observacoes = f"Tipo: {instance.tipo_fixo} | NF: {instance.nota_fiscal}"
+        novo_cr.save()
 
     # 3. WORKFLOW (DESPESA)
+    # lookup por cnpj_cpf (campo unique) para evitar IntegrityError
     fornecedor_extra, _ = Fornecedor.objects.get_or_create(
-        razao_social="LANÇAMENTOS EXTRAS (AUTO)",
-        defaults={'cnpj_cpf': '00000000000000'}
+        cnpj_cpf='00000000000000',
+        defaults={'razao_social': 'LANÇAMENTOS EXTRAS (AUTO)'}
     )
 
     if instance.workflow_criado:

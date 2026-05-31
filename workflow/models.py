@@ -25,33 +25,46 @@ FORMA_PAGTO_CHOICES = [
     ('DINHEIRO', 'Dinheiro')
 ]
 
+
 class Despesa(models.Model):
-    tipo_lancamento = models.CharField(max_length=20, choices=TIPO_LANCAMENTO_CHOICES, default='CAIXINHA', verbose_name="Tipo")
+    tipo_lancamento = models.CharField(max_length=20, choices=TIPO_LANCAMENTO_CHOICES, default='CAIXINHA',
+                                       verbose_name="Tipo")
     data_despesa = models.DateField(default=timezone.now, verbose_name="Data da Despesa")
-    fornecedor = models.ForeignKey(Fornecedor, on_delete=models.PROTECT, verbose_name="Fornecedor")
+    fornecedor = models.ForeignKey(Fornecedor, on_delete=models.PROTECT, verbose_name="Despesa")
     valor = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor (R$)")
     observacoes = models.TextField(blank=True, verbose_name="Observações")
-    solicitante = models.ForeignKey(UsuarioCustomizado, on_delete=models.PROTECT, related_name='solicitacoes', verbose_name="Solicitante")
-    status = models.CharField(max_length=20, choices=STATUS_WORKFLOW, default='AGUARDANDO_RH', verbose_name="Status Atual")
+    solicitante = models.ForeignKey(UsuarioCustomizado, on_delete=models.PROTECT, related_name='solicitacoes',
+                                    verbose_name="Solicitante")
+    status = models.CharField(max_length=20, choices=STATUS_WORKFLOW, default='AGUARDANDO_RH',
+                              verbose_name="Status Atual")
 
     # Campos específicos
-    comprovante = models.FileField(upload_to='comprovantes/', null=True, blank=True, verbose_name="Comprovante (Upload)")
-    inicio_cobertura = models.DateField(null=True, blank=True, verbose_name="Início Cobertura")
-    fim_cobertura = models.DateField(null=True, blank=True, verbose_name="Fim Cobertura")
+    # AJUSTE: Organização automática por Ano e Mês
+    comprovante = models.FileField(upload_to='comprovantes/%Y/%m/', null=True, blank=True,
+                                   verbose_name="Comprovante (Upload)")
+
+    inicio_cobertura = models.DateField(null=True, blank=True, verbose_name="Cob Início")
+    fim_cobertura = models.DateField(null=True, blank=True, verbose_name="Cob Fim")
     tomador = models.ForeignKey(Tomador, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Tomador")
     filial = models.ForeignKey(Filial, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Filial")
-    motivo_ausencia = models.ForeignKey(MotivoAusencia, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Motivo")
-    colaborador_faltou = models.ForeignKey(Colaborador, on_delete=models.SET_NULL, null=True, blank=True, related_name='faltas_workflow', verbose_name="Colaborador que Faltou")
+    motivo_ausencia = models.ForeignKey(MotivoAusencia, on_delete=models.SET_NULL, null=True, blank=True,
+                                        verbose_name="Motivo")
+    colaborador_faltou = models.ForeignKey(Colaborador, on_delete=models.SET_NULL, null=True, blank=True,
+                                           related_name='faltas_workflow', verbose_name="Quem Faltou")
 
     # DEFINIÇÃO DE PAGAMENTO (ADMINISTRATIVO)
     nome_cobriu = models.CharField(max_length=150, blank=True, null=True, verbose_name="Nome de Quem Cobriu")
-    forma_pagamento = models.CharField(max_length=10, choices=FORMA_PAGTO_CHOICES, blank=True, null=True, verbose_name="Forma Pagamento")
+    forma_pagamento = models.CharField(max_length=10, choices=FORMA_PAGTO_CHOICES, blank=True, null=True,
+                                       verbose_name="Forma Pagamento")
     dados_bancarios_pagto = models.TextField(blank=True, null=True, verbose_name="Dados para Pagamento")
 
     # Aprovação e Execução
-    empresa_pagadora = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Empresa Pagadora")
-    banco_pagador = models.ForeignKey(Banco, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Banco Pagador")
-    operador = models.ForeignKey(UsuarioCustomizado, on_delete=models.SET_NULL, null=True, blank=True, related_name='tarefas_operador', verbose_name="Selecione o Operador")
+    empresa_pagadora = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True,
+                                         verbose_name="Empresa Pagadora")
+    banco_pagador = models.ForeignKey(Banco, on_delete=models.SET_NULL, null=True, blank=True,
+                                      verbose_name="Banco Pagador")
+    operador = models.ForeignKey(UsuarioCustomizado, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='tarefas_operador', verbose_name="Selecione o Operador")
     motivo_cancelamento = models.TextField(blank=True, verbose_name="Motivo do Cancelamento")
     data_ultima_alteracao = models.DateTimeField(auto_now=True)
 
@@ -65,6 +78,7 @@ class Despesa(models.Model):
     class Meta:
         verbose_name = "Workflow de Despesa"
         verbose_name_plural = "Workflow de Despesas"
+
 
 class LogWorkflow(models.Model):
     despesa = models.ForeignKey(Despesa, on_delete=models.CASCADE, related_name='logs')

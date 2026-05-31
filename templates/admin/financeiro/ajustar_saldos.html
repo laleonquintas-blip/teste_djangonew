@@ -1,0 +1,57 @@
+{% extends "admin/base_site.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="card card-primary card-outline">
+    <div class="card-header" style="background-color: #343a40; color: white;">
+        <h3 class="card-title"><i class="fas fa-sliders-h"></i> Ajuste de Saldo Inicial das Contas</h3>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> <strong>Atenção Master:</strong> O valor inserido aqui será a "estaca zero" da conta. O Dashboard somará as Entradas e subtrairá as Saídas a partir deste valor.
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead style="background-color: #f4f6f9;">
+                        <tr>
+                            <th>Banco / Conta</th>
+                            <th style="width: 250px; text-align: right;">Saldo Inicial Atual</th>
+                            <th style="width: 250px;">Novo Saldo Inicial (R$)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for banco in bancos %}
+                        <tr>
+                            <td style="vertical-align: middle; font-weight: bold;">{{ banco.nome }}</td>
+                            <td style="vertical-align: middle; text-align: right; color: #6c757d;">
+                                R$ {{ banco.saldo_inicial|default:0|floatformat:2|intcomma }}
+                            </td>
+                            <td>
+                                <!-- Permite valores negativos se a conta começar a descoberto -->
+                                <input type="text"
+                                       name="saldo_inicial_{{ banco.id }}"
+                                       class="form-control"
+                                       value="{{ banco.saldo_inicial|default:0|floatformat:2 }}"
+                                       placeholder="Ex: 1500,00">
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center">Nenhum banco cadastrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-4 text-right">
+                <button type="submit" class="btn btn-dark btn-lg">
+                    💾 Salvar Todos os Saldos
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,90 @@
+/* static/css/admin_fixes.css */
+
+/* 1. Linha principal: flex com label fixo na esquerda */
+.form-group .row {
+    display: flex !important;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+}
+
+/* 2. Label da primeira coluna: largura fixa (igual ao col-sm-3 do Jazzmin) */
+.form-group .row > label.col-sm-3 {
+    width: 25% !important;
+    flex: 0 0 25% !important;
+    max-width: 25% !important;
+    padding-top: 6px;
+}
+
+/* 3. Cada fieldBox ocupa espaço igual e fixo */
+.form-group .row > .fieldBox {
+    flex: 1 1 0 !important;
+    width: 0 !important;          /* força distribuição igual pelo flex */
+    min-width: 0 !important;
+    max-width: 100% !important;
+    padding-right: 15px;
+    box-sizing: border-box;
+}
+
+.form-group .row > .fieldBox:last-child {
+    padding-right: 0;
+}
+
+/* 4. Label inline (entre campos) alinhado ao topo */
+.form-group .row > label.col-auto {
+    flex: 0 0 auto !important;
+    white-space: nowrap;
+    padding-top: 6px;
+    padding-right: 8px;
+    padding-left: 8px;
+}
+
+/* 5. Todos os inputs/selects ocupam 100% da sua coluna */
+.form-group .row > .fieldBox input[type="text"],
+.form-group .row > .fieldBox input[type="number"],
+.form-group .row > .fieldBox input[type="email"],
+.form-group .row > .fieldBox input[type="file"],
+.form-group .row > .fieldBox textarea,
+.form-group .row > .fieldBox .vDateField {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* 6. Select2 respeita 100% da coluna */
+.form-group .row > .fieldBox .select2-container,
+.form-group .row > .fieldBox .related-widget-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
+}
+
+/* 7. Data: o <p> que envolve o vDateField não pode vazar */
+.form-group .row > .fieldBox p.date {
+    margin: 0;
+    width: 100%;
+}
+
+.form-group .row > .fieldBox p.date .vDateField {
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* 8. Atalhos de data abaixo do input */
+.datetimeshortcuts {
+    display: block;
+    margin-top: 4px;
+    color: #3498db;
+}
+
+/* 9. readonly (campo Tipo = "Solicitação") se comporta como input */
+.form-group .row > .fieldBox .readonly {
+    display: block;
+    width: 100%;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    background: #f8f8f8;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    min-height: 36px;
+    line-height: 1.5;
+}

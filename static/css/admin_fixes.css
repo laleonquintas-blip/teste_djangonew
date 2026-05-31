@@ -1,42 +1,134 @@
 /* static/css/admin_fixes.css */
 
-/* 1. Transforma a linha do formulário em um container Flex (Flexbox) */
-.form-row {
+/* 1. Linha principal: flex com label fixo na esquerda */
+.form-group .row {
     display: flex !important;
-    flex-wrap: wrap; /* Permite quebrar linha em telas pequenas */
-    align-items: flex-start; /* Alinha tudo no topo */
+    align-items: flex-start;
+    flex-wrap: nowrap;
+}
+
+/* 2. Label da primeira coluna: largura fixa (igual ao col-sm-3 do Jazzmin) */
+.form-group .row > label.col-sm-3 {
+    width: 25% !important;
+    flex: 0 0 25% !important;
+    max-width: 25% !important;
+    padding-top: 6px;
+}
+
+/* 3. Cada fieldBox ocupa espaço igual e fixo */
+.form-group .row > .fieldBox {
+    flex: 1 1 0 !important;
+    width: 0 !important;          /* força distribuição igual pelo flex */
+    min-width: 0 !important;
+    max-width: 100% !important;
+    padding-right: 15px;
+    box-sizing: border-box;
+}
+
+.form-group .row > .fieldBox:last-child {
+    padding-right: 0;
+}
+
+/* 4. Label inline (entre campos) alinhado ao topo */
+.form-group .row > label.col-auto {
+    flex: 0 0 auto !important;
+    white-space: nowrap;
+    padding-top: 6px;
+    padding-right: 8px;
+    padding-left: 8px;
+}
+
+/* 5. Todos os inputs/selects ocupam 100% da sua coluna */
+.form-group .row > .fieldBox input[type="text"],
+.form-group .row > .fieldBox input[type="number"],
+.form-group .row > .fieldBox input[type="email"],
+.form-group .row > .fieldBox input[type="file"],
+.form-group .row > .fieldBox textarea,
+.form-group .row > .fieldBox .vDateField {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* 6. Select2 respeita 100% da coluna */
+.form-group .row > .fieldBox .select2-container,
+.form-group .row > .fieldBox .related-widget-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
+}
+
+/* 7. Data: o <p> que envolve o vDateField não pode vazar */
+.form-group .row > .fieldBox p.date {
+    margin: 0;
     width: 100%;
 }
 
-/* 2. Configura cada caixa de campo (field-box) para crescer igualmente */
-.form-row .field-box {
-    flex: 1; /* Faz os campos ocuparem o mesmo espaço (50%/50% se forem dois) */
-    min-width: 200px; /* Evita que fiquem muito espremidos */
-    margin-right: 20px; /* Espaço entre o campo da esquerda e o da direita */
-    display: block; /* Garante que label fique em cima e input embaixo */
-}
-
-/* Remove a margem do último item para não desalinhar a direita */
-.form-row .field-box:last-child {
-    margin-right: 0;
-}
-
-/* 3. Força os inputs e selects a ocuparem 100% da largura da caixa deles */
-.form-row .field-box select,
-.form-row .field-box input[type="text"],
-.form-row .field-box input[type="number"],
-.form-row .field-box input[type="email"],
-.form-row .field-box textarea,
-.form-row .field-box .vDateField,
-.form-row .field-box .vTimeField {
+.form-group .row > .fieldBox p.date .vDateField {
     width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box; /* Garante que a borda não aumente a largura */
+    box-sizing: border-box;
 }
 
-/* 4. Ajuste específico para datas (que as vezes ficam pequenas) */
+/* 8. Atalhos de data abaixo do input */
 .datetimeshortcuts {
-    display: block; /* Joga o link "Hoje | Calendário" para baixo do input */
-    margin-top: 5px;
+    display: block;
+    margin-top: 4px;
     color: #3498db;
 }
+
+/* 9. readonly (campo Tipo = "Solicitação") se comporta como input */
+.form-group .row > .fieldBox .readonly {
+    display: block;
+    width: 100%;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    background: #f8f8f8;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    min-height: 36px;
+    line-height: 1.5;
+}
+
+.admindatefilter .controls {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 5px !important;
+    margin-bottom: 15px !important;
+    padding-top: 5px !important;
+}
+
+.admindatefilter .controls input[type="submit"],
+.admindatefilter .controls input[type="reset"] {
+    flex: 1 1 0 !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    padding: 8px 0 !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-weight: bold !important;
+    font-size: 11px !important;
+    cursor: pointer !important;
+    text-transform: uppercase !important;
+    color: white !important;
+    margin: 0 !important;
+}
+
+.admindatefilter .controls input[type="submit"] {
+    background-color: #007bff !important;
+}
+
+.admindatefilter .controls input[type="reset"] {
+    background-color: #6c757d !important;
+}
+
+.admindatefilter .controls input[type="submit"]:hover { background-color: #0056b3 !important; }
+.admindatefilter .controls input[type="reset"]:hover  { background-color: #545b62 !important; }
+// static/js/admin_custom.js
+
+document.addEventListener('DOMContentLoaded', function () {
+    // Remove o width:48% inline que o rangefilter injeta no botão Pesquisar
+    document.querySelectorAll('.admindatefilter .controls input[type="submit"]').forEach(function (btn) {
+        btn.style.removeProperty('width');
+    });
+});

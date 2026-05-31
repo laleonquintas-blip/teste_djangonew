@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # SERVIÇO 1: O Site (Django)
+  web:
+    build: .
+    # Adicionei --reload para atualizar alterações automaticamente
+    command: gunicorn teste_django.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 600 --reload
+    volumes:
+      - .:/app
+    ports:             # <--- AQUI ESTÁ A MÁGICA
+      - "8000:8000"    # <--- TEM QUE ESTAR ASSIM
+    depends_on:
+      - db
+    environment:
+      - DB_NAME=malupe_db
+      - DB_USER=postgres
+      - DB_PASSWORD=sllQ@81014685T
+      - DB_HOST=db
+      - ALLOWED_HOSTS=*
+      - DEBUG=1
+      - EMAIL_BACKEND=django.core.mail.backends.dummy.EmailBackend
+
+  # SERVIÇO 2: O Banco de Dados (Postgres)
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=malupe_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=sllQ@81014685T
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  # SERVIÇO 3: O Porteiro (Caddy)
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

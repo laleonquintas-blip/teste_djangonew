@@ -32,13 +32,15 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
 
+
     # Meus Apps
     'core',
     'cadastros',
     'financeiro',
     'workflow',
     'import_export',
-    'rangefilter'
+    'rangefilter',
+    'gdstorage',
 ]
 
 MIDDLEWARE = [
@@ -109,7 +111,6 @@ JAZZMIN_SETTINGS = {
     "copyright": "Malupe Ltda",
     "search_model": ["cadastros.Cliente"],
 
-    # Mantemos aqui, mas o que vai valer mesmo é o CSS no HTML
     "custom_css": "css/admin_custom.css",
     "custom_js": "js/admin_custom.js",
 
@@ -117,6 +118,7 @@ JAZZMIN_SETTINGS = {
     "sidebar_nav_child_indent": True,
     "sidebar_nav_compact_style": True,
     "order_with_respect_to": ["workflow", "financeiro", "cadastros", "core"],
+
     "icons": {
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
@@ -126,7 +128,53 @@ JAZZMIN_SETTINGS = {
         "financeiro.ContasAPagar": "fas fa-money-bill-wave",
         "financeiro.ContasAReceber": "fas fa-hand-holding-usd",
         "financeiro.BaseSaldo": "fas fa-chart-line",
+        "financeiro.Transferencia": "fas fa-exchange-alt",
         "workflow.Despesa": "fas fa-tasks",
     },
+
+    # 1. ADICIONA LINKS CUSTOMIZADOS NO MENU FINANCEIRO
+    "custom_links": {
+        "financeiro": [
+            {
+                "name": "Dashboard Gerencial",
+                "url": "/admin/financeiro/dashboard-gerencial/",
+                "icon": "fas fa-chart-pie",
+                "new_window": False,
+                "permissions": ["financeiro.view_contasapagar"]
+            },
+            {
+                "name": "Ajuste de Saldos",
+                "url": "/admin/financeiro/ajustar-saldos/",
+                "icon": "fas fa-sliders-h",
+                "new_window": False,
+                "permissions": ["auth.add_user"]
+            }
+        ]
+    },
+
+    # 2. ESCONDE O DASHBOARD DO TOPO (evita duplicata)
+    "topmenu_links": [
+        {"name": "Início", "url": "admin:index", "permissions": ["auth.view_user"]},
+    ],
+
     "show_ui_builder": True,
+
 }
+# settings.py
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+GOOGLE_DRIVE_STORAGE_JSON_KEY_FILE = os.path.join(BASE_DIR, 'credenciais_google.json')
+GOOGLE_DRIVE_STORAGE_MEDIA_ROOT = 'Comprovantes_Sistema'
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+

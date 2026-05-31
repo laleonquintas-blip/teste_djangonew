@@ -1,0 +1,200 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static humanize %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* Estilos (Mesmos de antes) */
+    .card-dashboard {
+        border-radius: 10px;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+        margin-bottom: 20px;
+        background: white;
+        overflow: hidden;
+    }
+    .card-dashboard:hover { transform: translateY(-5px); }
+    .card-header-custom { padding: 15px; font-weight: bold; text-transform: uppercase; font-size: 0.9rem; }
+    .card-body-custom { padding: 20px; }
+    .big-number { font-size: 1.8rem; font-weight: 800; margin-bottom: 0; }
+    .text-small { font-size: 0.8rem; opacity: 0.8; }
+    .border-left-primary { border-left: 5px solid #4e73df; }
+    .border-left-success { border-left: 5px solid #1cc88a; }
+    .border-left-danger { border-left: 5px solid #e74a3b; }
+    .border-left-info { border-left: 5px solid #36b9cc; }
+
+    /* Filtro com cor diferente se estiver no passado */
+    .filter-card {
+        background: {% if modo_tempo == 'HISTORICO' %}#fff3cd{% else %}#f8f9fc{% endif %};
+        border: 1px solid #e3e6f0;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="row mb-2">
+        <div class="col-12">
+            <h1 class="h3 text-gray-800">
+                {% if modo_tempo == 'HISTORICO' %}
+                    ⏳ Máquina do Tempo: {{ data_referencia|date:"d/m/Y" }}
+                {% else %}
+                    📊 Painel Financeiro (Hoje)
+                {% endif %}
+            </h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="filter-card shadow-sm">
+                <form method="GET" class="form-inline d-flex align-items-center">
+                    <label class="mr-2 font-weight-bold text-gray-700">
+                        <i class="fas fa-calendar-alt"></i> Ver cenário em:
+                    </label>
+
+                    <input type="date"
+                           name="filtro_vencimento"
+                           class="form-control mr-2"
+                           value="{{ filtro_atual|default:'' }}">
+
+                    <button type="submit" class="btn btn-primary btn-sm mr-2">
+                        <i class="fas fa-history"></i> Viajar
+                    </button>
+
+                    {% if filtro_atual %}
+                    <a href="?" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-undo"></i> Voltar para Hoje
+                    </a>
+                    {% endif %}
+                </form>
+                {% if modo_tempo == 'HISTORICO' %}
+                <small class="text-warning font-weight-bold mt-2 d-block">
+                    <i class="fas fa-exclamation-triangle"></i> Atenção: Os saldos abaixo foram recalculados considerando apenas pagamentos baixados até {{ data_referencia|date:"d/m/Y" }}.
+                </small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <h5 class="mb-3 text-secondary">
+        <i class="fas fa-university"></i> Saldos em Conta (Na data {{ data_referencia|date:"d/m" }})
+    </h5>
+
+    <div class="row">
+        {% for banco in dados_bancos %}
+        <div class="col-xl-3 col-md-6">
+            <div class="card-dashboard border-left-primary">
+                <div class="card-body-custom">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                {{ banco.nome }}
+                            </div>
+                            <div class="big-number text-gray-800">
+                                R$ {{ banco.saldo|floatformat:2|intcomma }}
+                            </div>
+                            <div class="mt-2 text-small">
+                                <span class="text-success mr-2" title="Entradas até a data">
+                                    <i class="fas fa-arrow-up"></i> {{ banco.entradas|floatformat:2|intcomma }}
+                                </span>
+                                <span class="text-danger" title="Saídas até a data">
+                                    <i class="fas fa-arrow-down"></i> {{ banco.saidas|floatformat:2|intcomma }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-wallet fa-2x text-gray-300" style="opacity: 0.3"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 mb-3">
+            <div class="alert alert-light border">Nenhuma movimentação encontrada até esta data.</div>
+        </div>
+        {% endfor %}
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card-dashboard border-left-info bg-info text-white">
+                <div class="card-body-custom">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-white text-uppercase mb-1" style="opacity:0.8">
+                                Saldo Geral Consolidado
+                            </div>
+                            <div class="big-number text-white">
+                                R$ {{ saldo_geral|floatformat:2|intcomma }}
+                            </div>
+                            <div class="mt-2 text-small text-white">
+                                Na data {{ data_referencia|date:"d/m/Y" }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-white" style="opacity: 0.5"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr class="my-4">
+
+    <h5 class="mb-3 text-secondary">
+        <i class="fas fa-calendar-alt"></i> Títulos Pendentes (Cenário em {{ data_referencia|date:"d/m" }})
+    </h5>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card-dashboard border-left-success h-100">
+                <div class="card-header-custom bg-success text-white">
+                    <i class="fas fa-hand-holding-usd"></i> Contas a Receber
+                </div>
+                <div class="card-body-custom">
+                    <div class="row text-center">
+                        <div class="col-6 border-right">
+                            <h6 class="text-danger font-weight-bold mb-1">VENCIDOS <br><small>(Antes de {{ data_referencia|date:"d/m" }})</small></h6>
+                            <h3 class="text-danger mb-0">R$ {{ cr.vencidos_valor|floatformat:2|intcomma }}</h3>
+                            <small class="badge badge-danger mt-2 mb-3">{{ cr.vencidos_qtd }} Títulos</small>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-success font-weight-bold mb-1">A VENCER <br><small>(Após {{ data_referencia|date:"d/m" }})</small></h6>
+                            <h3 class="text-success mb-0">R$ {{ cr.a_vencer_valor|floatformat:2|intcomma }}</h3>
+                            <small class="badge badge-success mt-2 mb-3">{{ cr.a_vencer_qtd }} Títulos</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <div class="card-dashboard border-left-danger h-100">
+                <div class="card-header-custom bg-danger text-white">
+                    <i class="fas fa-money-bill-wave"></i> Contas a Pagar
+                </div>
+                <div class="card-body-custom">
+                    <div class="row text-center">
+                        <div class="col-6 border-right">
+                            <h6 class="text-danger font-weight-bold mb-1">VENCIDOS <br><small>(Antes de {{ data_referencia|date:"d/m" }})</small></h6>
+                            <h3 class="text-danger mb-0">R$ {{ cp.vencidos_valor|floatformat:2|intcomma }}</h3>
+                            <small class="badge badge-danger mt-2 mb-3">{{ cp.vencidos_qtd }} Títulos</small>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-warning font-weight-bold mb-1" style="color: #fd7e14 !important;">A VENCER <br><small>(Após {{ data_referencia|date:"d/m" }})</small></h6>
+                            <h3 class="text-warning mb-0" style="color: #fd7e14 !important;">R$ {{ cp.a_vencer_valor|floatformat:2|intcomma }}</h3>
+                            <small class="badge badge-warning mt-2 mb-3">{{ cp.a_vencer_qtd }} Títulos</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

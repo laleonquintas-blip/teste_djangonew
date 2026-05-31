@@ -28,13 +28,11 @@ class DespesaForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-        # 1. AUTO-PREENCHIMENTO DO SOLICITANTE
         if not self.instance.pk and self.request:
             self.fields['solicitante'].initial = self.request.user
             self.fields['solicitante'].disabled = True
             self.fields['solicitante'].help_text = "Definido automaticamente como o usuário logado."
 
-        # 2. CAMPO OCULTO DE TIPO
         tipo_real = None
         if self.instance.pk:
             tipo_real = self.instance.tipo_lancamento
@@ -45,7 +43,6 @@ class DespesaForm(forms.ModelForm):
             self.fields['tipo_reserva'].initial = tipo_real
             self.instance.tipo_lancamento = tipo_real
 
-        # 3. FILTRO DE OPERADORES
         if 'operador' in self.fields:
             try:
                 grupo_op = Group.objects.get(name='Operador')
@@ -53,15 +50,20 @@ class DespesaForm(forms.ModelForm):
             except Group.DoesNotExist:
                 pass
 
-        # 4. FILTRO DE STATUS
         if self.request and 'status' in self.fields:
             user = self.request.user
             if not user.is_superuser:
                 grupos_usuario = list(user.groups.values_list('name', flat=True))
 
-                status_atual = self.instance.status if self.instance.pk else 'AGUARDANDO_RH'
-                if tipo_real == 'EXTRA' and not self.instance.pk:
-                    status_atual = 'AGUARDANDO_ADM'
+                if self.instance.pk:
+                    status_atual = self.instance.status
+                else:
+                    if tipo_real == 'EXTRA':
+                        status_atual = 'AGUARDANDO_ADM'
+                    elif tipo_real == 'CAIXINHA':
+                        status_atual = 'AGUARDANDO_FIN'
+                    else:
+                        status_atual = 'AGUARDANDO_RH'
 
                 regras_acesso = {
                     'Administrativo': ['AGUARDANDO_ADM', 'AGUARDANDO_RH', 'CANCELADO'],
@@ -83,7 +85,6 @@ class DespesaForm(forms.ModelForm):
                     (k, v) for k, v in todas_opcoes if k in status_permitidos
                 ]
 
-        # 5. CAMPOS OPCIONAIS
         campos_livres = [
             'data_despesa', 'fornecedor', 'valor', 'observacoes',
             'solicitante', 'status', 'tipo_lancamento', 'operador',
@@ -98,8 +99,10 @@ class DespesaForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         tipo = cleaned_data.get('tipo_reserva')
-        if not tipo: tipo = self.instance.tipo_lancamento
-        if not tipo: tipo = 'CAIXINHA'
+        if not tipo:
+            tipo = self.instance.tipo_lancamento
+        if not tipo:
+            tipo = 'CAIXINHA'
 
         self.instance.tipo_lancamento = tipo
         cleaned_data['tipo_lancamento'] = tipo
@@ -121,14 +124,16 @@ class DespesaForm(forms.ModelForm):
             if is_extra_inicial and is_admin_group:
                 campos_editaveis_adm = ['valor', 'nome_cobriu', 'forma_pagamento', 'dados_bancarios_pagto']
                 for c in campos_editaveis_adm:
-                    if c in protegidos: protegidos.remove(c)
+                    if c in protegidos:
+                        protegidos.remove(c)
 
             for campo in protegidos:
                 if not cleaned_data.get(campo):
                     original = getattr(self.instance, campo)
                     if original is not None and original != '':
                         cleaned_data[campo] = original
-                        if campo in self._errors: del self._errors[campo]
+                        if campo in self._errors:
+                            del self._errors[campo]
 
         status = cleaned_data.get('status')
         operador = cleaned_data.get('operador')
@@ -139,6 +144,15 @@ class DespesaForm(forms.ModelForm):
         motivo = cleaned_data.get('motivo_cancelamento')
         if status and 'CANCELADO' in str(status) and not motivo:
             self.add_error('motivo_cancelamento', 'Motivo obrigatório ao cancelar.')
+
+        # VALIDAÇÃO: bloqueia PAGO sem empresa e banco
+        if status == 'PAGO':
+            empresa = cleaned_data.get('empresa_pagadora')
+            banco = cleaned_data.get('banco_pagador')
+            if not empresa:
+                self.add_error('empresa_pagadora', 'Empresa Pagadora é obrigatória para marcar como PAGO.')
+            if not banco:
+                self.add_error('banco_pagador', 'Banco Pagador é obrigatório para marcar como PAGO.')
 
         return cleaned_data
 
@@ -162,7 +176,6 @@ class DespesaAdmin(admin.ModelAdmin):
 
     class Media:
         js = ('js/admin_despesa.js',)
-
         css = {
             'all': ('css/admin_fixes.css',)
         }
@@ -174,13 +187,15 @@ class DespesaAdmin(admin.ModelAdmin):
 
     CORES_SISTEMA = {
         'AGUARDANDO_ADM': '#e67e22',
-        'AGUARDANDO_RH': '#f39c12', 'AGUARDANDO_FIN': '#3498db',
-        'DIRECIONADO_OP': '#9b59b6', 'PAGO': '#27ae60',
-        'RASCUNHO': '#95a5a6', 'CANCELADO': '#c0392b'
+        'AGUARDANDO_RH': '#f39c12',
+        'AGUARDANDO_FIN': '#3498db',
+        'DIRECIONADO_OP': '#9b59b6',
+        'PAGO': '#27ae60',
+        'RASCUNHO': '#95a5a6',
+        'CANCELADO': '#c0392b'
     }
 
     def get_form(self, request, obj=None, **kwargs):
-        # 1. SOLUÇÃO DEFINITIVA PARA REMOVER ÍCONES E ALINHAR
         form = super().get_form(request, obj, **kwargs)
         for field in form.base_fields.values():
             if hasattr(field.widget, 'can_add_related'):
@@ -189,7 +204,6 @@ class DespesaAdmin(admin.ModelAdmin):
                 field.widget.can_delete_related = False
                 field.widget.can_view_related = False
 
-        # 2. Classe Wrapper para injeção de request (necessário para seu filtro de usuário)
         class RequestDespesaForm(form):
             def __init__(self, *args, **kwargs):
                 kwargs['request'] = request
@@ -201,14 +215,21 @@ class DespesaAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         user = request.user
-        if user.is_superuser: return qs
+
+        if user.is_superuser:
+            return qs
+
         grupos = list(user.groups.values_list('name', flat=True))
+
+        if 'Aprovador RH' in grupos and 'Aprovador Financeiro' not in grupos:
+            return qs.filter(tipo_lancamento='SOLICITACAO')
 
         if 'Aprovador Financeiro' in grupos or 'Operador' in grupos:
             return qs
 
         filtro_base = Q(solicitante=user)
-        if 'Aprovador RH' in grupos: filtro_base |= Q(status='AGUARDANDO_RH')
+        if 'Administrativo' in grupos:
+            filtro_base |= Q(status='AGUARDANDO_ADM')
 
         return qs.filter(filtro_base).distinct()
 
@@ -220,7 +241,8 @@ class DespesaAdmin(admin.ModelAdmin):
             user = request.user
             grupos = list(user.groups.values_list('name', flat=True))
 
-            if user.is_superuser: return []
+            if user.is_superuser:
+                return []
 
             if not self.has_change_permission(request, obj):
                 return [f.name for f in self.model._meta.fields]
@@ -238,23 +260,40 @@ class DespesaAdmin(admin.ModelAdmin):
             ro_fields.extend(campos_travados_padrao)
 
             if not ('Aprovador Financeiro' in grupos or 'Operador' in grupos):
-                ro_fields.extend(['empresa_pagadora', 'banco_pagador', 'operador'])
+                ro_fields.extend(['operador'])
 
         return ro_fields
 
     # --- FIELDSETS ---
     def get_fieldsets(self, request, obj=None):
+        user = request.user
+        grupos = list(user.groups.values_list('name', flat=True))
+
+        tipo = obj.tipo_lancamento if obj else request.GET.get('tipo', 'CAIXINHA')
+
+        if tipo == 'CAIXINHA':
+            campos_lancamento = (
+                'tipo_reserva',
+                ('tipo_lancamento', 'data_despesa'),
+                ('fornecedor', 'valor'),
+                ('solicitante', 'comprovante'),
+                'observacoes'
+            )
+        else:
+            campos_lancamento = (
+                'tipo_reserva',
+                ('tipo_lancamento', 'data_despesa'),
+                ('fornecedor', 'valor'),
+                ('tomador', 'filial'),
+                ('motivo_ausencia', 'colaborador_faltou'),
+                ('inicio_cobertura', 'fim_cobertura'),
+                ('solicitante', 'comprovante'),
+                'observacoes'
+            )
+
         fieldsets = [
             ('Dados do Lançamento', {
-                'fields': (
-                    'tipo_lancamento', 'tipo_reserva',
-                    'solicitante',
-                    'fornecedor', 'data_despesa', 'valor', 'observacoes',
-                    'comprovante',
-                    ('inicio_cobertura', 'fim_cobertura'),
-                    ('tomador', 'filial'),
-                    ('motivo_ausencia', 'colaborador_faltou')
-                )
+                'fields': campos_lancamento
             }),
         ]
 
@@ -262,54 +301,61 @@ class DespesaAdmin(admin.ModelAdmin):
             fieldsets.append(('Definição de Pagamento (Administrativo)', {
                 'fields': (
                     'nome_cobriu',
-                    'forma_pagamento',
-                    'dados_bancarios_pagto'
+                    ('forma_pagamento', 'dados_bancarios_pagto')
                 )
             }))
 
-        user = request.user
-        grupos = list(user.groups.values_list('name', flat=True))
+        pode_ver_pagamento = (user.is_superuser or 'Aprovador Financeiro' in grupos or 'Operador' in grupos)
         is_aprovador = any(g in grupos for g in ['Aprovador Financeiro', 'Aprovador RH', 'Operador', 'Administrativo'])
 
-        if user.is_superuser or is_aprovador:
-            campos_aprovacao = ['status', 'operador']
-            if user.is_superuser or 'Aprovador Financeiro' in grupos or 'Operador' in grupos:
-                campos_aprovacao.extend(['empresa_pagadora', 'banco_pagador'])
+        campos_aprovacao = ['status']
 
+        if user.is_superuser or 'Aprovador Financeiro' in grupos or 'Operador' in grupos:
+            campos_aprovacao.append('operador')
+
+        if user.is_superuser or is_aprovador:
+            if pode_ver_pagamento:
+                campos_aprovacao.append(('empresa_pagadora', 'banco_pagador'))
             campos_aprovacao.append('motivo_cancelamento')
 
-            fieldsets.append(('Aprovação / Execução', {
-                'fields': tuple(campos_aprovacao)
-            }))
+        fieldsets.append(('Aprovação / Execução', {
+            'fields': tuple(campos_aprovacao)
+        }))
 
         return fieldsets
 
     # --- PERMISSÕES ---
     def has_change_permission(self, request, obj=None):
-        if not obj: return True
+        if not obj:
+            return True
         user = request.user
-        if user.is_superuser: return True
+        if user.is_superuser:
+            return True
 
         grupos = list(user.groups.values_list('name', flat=True))
 
         if 'Administrativo' in grupos and obj.status == 'AGUARDANDO_ADM':
-            if obj.solicitante == user: return True
+            if obj.solicitante == user:
+                return True
 
-        if 'Aprovador RH' in grupos and obj.status == 'AGUARDANDO_RH': return True
+        if 'Aprovador RH' in grupos and obj.status == 'AGUARDANDO_RH':
+            return True
 
         if 'Aprovador Financeiro' in grupos:
-            if obj.status in ['AGUARDANDO_FIN', 'DIRECIONADO_OP']: return True
+            if obj.status in ['AGUARDANDO_FIN', 'DIRECIONADO_OP']:
+                return True
 
         if 'Operador' in grupos:
-            if obj.status == 'DIRECIONADO_OP': return True
+            if obj.status == 'DIRECIONADO_OP':
+                return True
 
-        if obj.solicitante == user and obj.status == 'RASCUNHO': return True
+        if obj.solicitante == user and obj.status == 'RASCUNHO':
+            return True
 
         return False
 
     # --- HELPERS ---
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        # AQUI FICA APENAS A LÓGICA DE FILTRO (SEM CÓDIGO VISUAL)
         if db_field.name == "fornecedor":
             user = request.user
             if not user.is_superuser and hasattr(user, 'acesso_despesa') and user.acesso_despesa:
@@ -326,10 +372,11 @@ class DespesaAdmin(admin.ModelAdmin):
 
             if obj.tipo_lancamento == 'EXTRA':
                 obj.status = 'AGUARDANDO_ADM'
-            elif obj.tipo_lancamento == 'SOLICITACAO':
-                obj.status = 'AGUARDANDO_RH'
-            else:
+            elif obj.tipo_lancamento == 'CAIXINHA':
                 obj.status = 'AGUARDANDO_FIN'
+            else:
+                obj.status = 'AGUARDANDO_RH'
+
             acao_log = "Criou Registro"
         else:
             acao_log = "Editou"
@@ -363,20 +410,40 @@ class DespesaAdmin(admin.ModelAdmin):
             perfil = "Administrativo"
 
         obs = f"Status: {obj.get_status_display()}"
-        if obj.operador: obs += f" -> {obj.operador.first_name}"
-        if 'valor' in form.changed_data: obs += f" | Alterou Valor para R$ {obj.valor}"
+        if obj.operador:
+            obs += f" -> {obj.operador.first_name}"
+        if 'valor' in form.changed_data:
+            obs += f" | Alterou Valor para R$ {obj.valor}"
 
-        LogWorkflow.objects.create(despesa=obj, usuario=request.user, perfil_usuario=perfil, acao=acao_log,
-                                   observacao=obs)
+        LogWorkflow.objects.create(
+            despesa=obj,
+            usuario=request.user,
+            perfil_usuario=perfil,
+            acao=acao_log,
+            observacao=obs
+        )
 
     def gerar_contas_a_pagar(self, despesa, request):
+        if not despesa.banco_pagador or not despesa.empresa_pagadora:
+            self.message_user(
+                request,
+                "⚠️ Conta a Pagar NÃO gerada: Banco ou Empresa Pagadora não informados.",
+                level='WARNING'
+            )
+            return
+
         if not ContasAPagar.objects.filter(nota=f"WF-{despesa.id}").exists():
             ContasAPagar.objects.create(
-                fornecedor=despesa.fornecedor, empresa_pagadora=despesa.empresa_pagadora,
-                banco=despesa.banco_pagador, data_emissao=despesa.data_despesa,
-                vencimento=timezone.now().date(), valor=despesa.valor,
-                nota=f"WF-{despesa.id}", status='PAGO',
-                data_baixa=timezone.now().date(), usuario_baixa=request.user
+                fornecedor=despesa.fornecedor,
+                empresa_pagadora=despesa.empresa_pagadora,
+                banco=despesa.banco_pagador,
+                data_emissao=despesa.data_despesa,
+                vencimento=timezone.now().date(),
+                valor=despesa.valor,
+                nota=f"WF-{despesa.id}",
+                status='PAGO',
+                data_baixa=timezone.now().date(),
+                usuario_baixa=request.user
             )
 
     def changelist_view(self, request, extra_context=None):
@@ -390,10 +457,14 @@ class DespesaAdmin(admin.ModelAdmin):
         for item in metrics:
             st = item['status']
             cor = self.CORES_SISTEMA.get(st, '#95a5a6')
-            if 'CANCELADO' in st: cor = self.CORES_SISTEMA['CANCELADO']
+            if 'CANCELADO' in st:
+                cor = self.CORES_SISTEMA['CANCELADO']
             summary.append({
-                'status_key': st, 'status_label': dict(Despesa._meta.get_field('status').choices).get(st, st),
-                'total_valor': item['total_valor'], 'total_qtd': item['total_qtd'], 'color': cor
+                'status_key': st,
+                'status_label': dict(Despesa._meta.get_field('status').choices).get(st, st),
+                'total_valor': item['total_valor'],
+                'total_qtd': item['total_qtd'],
+                'color': cor
             })
         response.context_data['summary_data'] = summary
         return response
@@ -405,8 +476,12 @@ class DespesaAdmin(admin.ModelAdmin):
 
     def status_badge(self, obj):
         cor = self.CORES_SISTEMA.get(obj.status, '#95a5a6')
-        if 'CANCELADO' in obj.status: cor = self.CORES_SISTEMA['CANCELADO']
-        style = f'color:white; background-color:{cor}; padding:5px; border-radius:10px; font-weight:bold; font-size:11px; display: inline-block; width: 140px; text-align: center;'
+        if 'CANCELADO' in obj.status:
+            cor = self.CORES_SISTEMA['CANCELADO']
+        style = (
+            f'color:white; background-color:{cor}; padding:5px; border-radius:10px; '
+            f'font-weight:bold; font-size:11px; display: inline-block; width: 140px; text-align: center;'
+        )
         return mark_safe(f'<span style="{style}">{obj.get_status_display()}</span>')
 
     status_badge.short_description = "Status"
@@ -418,7 +493,10 @@ class DespesaAdmin(admin.ModelAdmin):
             cor = '#e67e22'
         else:
             cor = '#17a2b8'
-        style = f'color:white; background-color:{cor}; padding:5px; border-radius:4px; display: inline-block; width: 100px; text-align: center;'
+        style = (
+            f'color:white; background-color:{cor}; padding:5px; border-radius:4px; '
+            f'display: inline-block; width: 100px; text-align: center;'
+        )
         return mark_safe(f'<span style="{style}">{obj.get_tipo_lancamento_display()}</span>')
 
     tipo_badge.short_description = "Tipo"

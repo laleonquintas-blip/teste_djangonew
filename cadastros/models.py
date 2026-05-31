@@ -6,7 +6,7 @@ from django.db import models
 class Banco(models.Model):
     # O Django cria um campo 'id' automático que será nosso Código (ex: 1, 2, 3)
     nome = models.CharField(max_length=100, verbose_name="Nome do Banco")
-
+    saldo_inicial = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="Saldo Inicial")
     def __str__(self):
         return self.nome
 

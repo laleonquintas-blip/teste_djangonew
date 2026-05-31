@@ -2,7 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from django.db.models import Q
-from financeiro.models import ContasAReceber
+from financeiro.models import ContasAReceber, Sequencial
 from workflow.models import Despesa
 from cadastros.models import Tomador, Filial, MotivoAusencia, Colaborador, Banco, Empresa
 
@@ -74,6 +74,8 @@ class LancamentoExtra(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.nota_fiscal:
-            proximo_id = LancamentoExtra.objects.count() + 1
-            self.nota_fiscal = f"LE{proximo_id:04d}"
+            contador, _ = Sequencial.objects.get_or_create(prefixo='LE', defaults={'ultimo_numero': 0})
+            contador.ultimo_numero += 1
+            contador.save()
+            self.nota_fiscal = f"LE{contador.ultimo_numero:04d}"
         super().save(*args, **kwargs)

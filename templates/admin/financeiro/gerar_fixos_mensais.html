@@ -1,0 +1,144 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div class="card card-primary card-outline">
+    <div class="card-header">
+        <h3 class="card-title">Seleção de Clientes e Atualização de Vencimentos</h3>
+    </div>
+    <div class="card-body">
+        <form method="POST" id="form-gerar-fixos">
+            {% csrf_token %}
+
+            <div class="row mb-4 align-items-end" style="display: flex; gap: 15px;">
+                <div style="flex: 1; max-width: 200px;">
+                    <label>Mês do Vencimento</label>
+                    <input type="number" name="mes" id="input_mes" class="form-control" min="1" max="12" placeholder="Ex: 05">
+                </div>
+                <div style="flex: 1; max-width: 200px;">
+                    <label>Ano do Vencimento</label>
+                    <input type="number" name="ano" id="input_ano" class="form-control" placeholder="Ex: 2026">
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <button type="button" class="btn btn-info" onclick="atualizarVencimentos()" style="height: 38px;">
+                        🔄 Atualizar Vencimentos
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead style="background-color: #f4f6f9;">
+                        <tr>
+                            <th style="width: 50px; text-align: center;"><input type="checkbox" id="check_all"></th>
+                            <th>Cliente</th>
+                            <th style="text-align: center;">Dia Venc.</th>
+                            <th>Empresa de Recebimento</th>
+                            <th>Banco</th>
+                            <th>Vencimento a Gerar</th>
+                            <th>Valor Base</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cliente in clientes %}
+                        <tr>
+                            <td style="text-align: center; vertical-align: middle;">
+                                <input type="checkbox" name="clientes_selecionados" value="{{ cliente.id }}" class="cliente_check">
+                            </td>
+                            <td style="vertical-align: middle;">{{ cliente.razao_social }}</td>
+                            <td style="text-align: center; vertical-align: middle;" class="dia-vencimento">{{ cliente.dia_vencimento }}</td>
+
+                            <td style="min-width: 180px;">
+                                <select name="empresa_id_{{ cliente.id }}" class="form-control select-empresa">
+                                    <option value="">-- Selecione --</option>
+                                    {% for empresa in empresas %}
+                                        <option value="{{ empresa.id }}">{{ empresa.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+
+                            <td style="min-width: 180px;">
+                                <select name="banco_id_{{ cliente.id }}" class="form-control select-banco">
+                                    <option value="">-- Selecione --</option>
+                                    {% for banco in bancos %}
+                                        <option value="{{ banco.id }}">{{ banco.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+
+                            <td style="min-width: 160px;">
+                                <input type="date" name="data_gerar_{{ cliente.id }}" class="form-control data-gerar" readonly>
+                            </td>
+                            <td style="vertical-align: middle;">R$ {{ cliente.valor_contrato }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" style="text-align: center;">Nenhum cliente fixo encontrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 text-right">
+                <button type="submit" class="btn btn-primary btn-lg" onclick="return validarEnvio()">
+                    ✅ Confirmar e Gerar Contas a Receber
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Selecionar/Deselecionar todos os checkboxes
+    document.getElementById('check_all').addEventListener('change', function() {
+        let checkboxes = document.querySelectorAll('.cliente_check');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+
+    // Lógica do botão Atualizar Vencimentos
+    function atualizarVencimentos() {
+        let mes = document.getElementById('input_mes').value;
+        let ano = document.getElementById('input_ano').value;
+
+        if(!mes || !ano) {
+            alert('Por favor, informe o Mês e o Ano antes de atualizar.');
+            return;
+        }
+
+        if(mes.length === 1) mes = '0' + mes;
+
+        let rows = document.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            let diaTd = row.querySelector('.dia-vencimento');
+            if(!diaTd) return;
+
+            let dia = diaTd.innerText.trim();
+            if(!dia) return;
+
+            if(dia.length === 1) dia = '0' + dia;
+
+            let dataInput = row.querySelector('.data-gerar');
+            dataInput.value = `${ano}-${mes}-${dia}`;
+
+            row.querySelector('.cliente_check').checked = true;
+        });
+    }
+
+    // Validação de segurança para garantir que a linha marcada tem empresa e banco preenchidos
+    function validarEnvio() {
+        let rows = document.querySelectorAll('tbody tr');
+        for (let row of rows) {
+            let checkbox = row.querySelector('.cliente_check');
+            if (checkbox && checkbox.checked) {
+                let empresa = row.querySelector('.select-empresa').value;
+                let banco = row.querySelector('.select-banco').value;
+                if (!empresa || !banco) {
+                    alert('Erro: Certifique-se de que todas as linhas marcadas possuem Empresa e Banco selecionados.');
+                    return false; // Impede o envio do formulário
+                }
+            }
+        }
+        return true;
+    }
+</script>
+{% endblock %}
