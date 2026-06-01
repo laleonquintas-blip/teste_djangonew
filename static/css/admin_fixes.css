@@ -1,5 +1,22 @@
 /* static/css/admin_fixes.css */
 
+/* Tabela de prévia de importação (import_export) */
+.import-preview table tbody tr,
+.import-preview table tbody tr td,
+#result_list tbody tr,
+#result_list tbody tr td {
+    background-color: #fff !important;
+    color: #212529 !important;
+}
+.import-preview table tbody tr:nth-child(even),
+#result_list tbody tr:nth-child(even) {
+    background-color: #f8f9fa !important;
+}
+.import-preview table tbody tr:hover,
+#result_list tbody tr:hover {
+    background-color: #e9ecef !important;
+}
+
 /* 1. Linha principal: flex com label fixo na esquerda */
 .form-group .row {
     display: flex !important;
