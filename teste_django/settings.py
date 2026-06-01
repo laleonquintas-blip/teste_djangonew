@@ -40,7 +40,6 @@ INSTALLED_APPS = [
     'workflow',
     'import_export',
     'rangefilter',
-    'gdstorage',
 ]
 
 MIDDLEWARE = [
