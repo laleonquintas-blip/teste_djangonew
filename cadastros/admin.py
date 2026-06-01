@@ -25,6 +25,10 @@ class ColaboradorResource(resources.ModelResource):
         skip_unchanged = True
         report_skipped = True
 
+    def before_import_row(self, row, **kwargs):
+        if not row.get('departamento'):
+            row['departamento'] = ''
+
 
 class FilialResource(resources.ModelResource):
     nome = fields.Field(attribute='nome', column_name='nome')
