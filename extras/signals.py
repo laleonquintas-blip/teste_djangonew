@@ -10,17 +10,34 @@ from cadastros.models import Fornecedor, Cliente
 
 @receiver(post_save, sender=LancamentoExtra)
 def automacao_extras(sender, instance, created, **kwargs):
-    # 1. CLIENTE GENÉRICO — lookup por cnpj_cpf (campo unique) para evitar IntegrityError
-    cliente_padrao, _ = Cliente.objects.get_or_create(
-        cnpj_cpf='00000000000',
-        defaults={
-            'razao_social': 'CLIENTE EXTRA (AUTO)',
-            'dia_vencimento': 1,
-            'valor_contrato': 0.00,
-            'ativo': True,
-            'tipo': 'EVENTUAL'
-        }
-    )
+    # 1. CLIENTE — usa o Tomador se disponível, senão cai no genérico
+    if instance.tomador:
+        cnpj_tomador = f"TOM{instance.tomador.id:017d}"
+        cliente_padrao, _ = Cliente.objects.get_or_create(
+            cnpj_cpf=cnpj_tomador,
+            defaults={
+                'razao_social': instance.tomador.nome,
+                'dia_vencimento': 1,
+                'valor_contrato': 0.00,
+                'ativo': True,
+                'tipo': 'EVENTUAL'
+            }
+        )
+        # Mantém o nome do tomador atualizado
+        if cliente_padrao.razao_social != instance.tomador.nome:
+            cliente_padrao.razao_social = instance.tomador.nome
+            cliente_padrao.save()
+    else:
+        cliente_padrao, _ = Cliente.objects.get_or_create(
+            cnpj_cpf='00000000000',
+            defaults={
+                'razao_social': 'CLIENTE EXTRA (AUTO)',
+                'dia_vencimento': 1,
+                'valor_contrato': 0.00,
+                'ativo': True,
+                'tipo': 'EVENTUAL'
+            }
+        )
 
     # 2. CONTAS A RECEBER — não sobrescreve o status se já estiver PAGO
     nota_cr = f"EXTRA-{instance.nota_fiscal}"

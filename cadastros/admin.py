@@ -1,24 +1,73 @@
 from django.contrib import admin
-# Importa a funcionalidade de Importação/Exportação para carga em massa
+from import_export import resources, fields
 from import_export.admin import ImportExportModelAdmin
+from import_export.widgets import CharWidget
 from .models import (
     Banco, Empresa, Cliente, Fornecedor,
     Colaborador, Tomador, TipoServico,
-    MotivoAusencia, Filial  # <-- Filial incluída
+    MotivoAusencia, Filial
 )
 
 
-# --- 1. CLASSES ADMIN CUSTOMIZADAS (Para Import/Export ou Listagem Detalhada) ---
+# --- RESOURCES (definem layout e regras de importação) ---
 
-# Usa ImportExportModelAdmin para habilitar a Carga em Massa
+class ColaboradorResource(resources.ModelResource):
+    nome = fields.Field(attribute='nome', column_name='nome')
+    cpf = fields.Field(attribute='cpf', column_name='cpf')
+    departamento = fields.Field(attribute='departamento', column_name='departamento')
+    empresa = fields.Field(attribute='empresa', column_name='empresa')
+
+    class Meta:
+        model = Colaborador
+        import_id_fields = ('cpf',)   # CPF é a chave — evita duplicatas
+        fields = ('nome', 'cpf', 'departamento', 'empresa')
+        export_order = ('nome', 'cpf', 'departamento', 'empresa')
+        skip_unchanged = True
+        report_skipped = True
+
+
+class FilialResource(resources.ModelResource):
+    nome = fields.Field(attribute='nome', column_name='nome')
+    cnpj = fields.Field(attribute='cnpj', column_name='cnpj')
+
+    class Meta:
+        model = Filial
+        import_id_fields = ('nome',)   # Nome é a chave — evita duplicatas
+        fields = ('nome', 'cnpj')
+        export_order = ('nome', 'cnpj')
+        skip_unchanged = True
+        report_skipped = True
+
+
+class TomadorResource(resources.ModelResource):
+    nome = fields.Field(attribute='nome', column_name='nome')
+
+    class Meta:
+        model = Tomador
+        import_id_fields = ('nome',)   # Nome é a chave — evita duplicatas
+        fields = ('nome',)
+        export_order = ('nome',)
+        skip_unchanged = True
+        report_skipped = True
+
+
+# --- ADMIN ---
+
 class ColaboradorAdmin(ImportExportModelAdmin):
+    resource_classes = [ColaboradorResource]
     list_display = ('id', 'nome', 'cpf', 'departamento', 'empresa')
     search_fields = ('nome', 'cpf')
 
 
-# Usa ImportExportModelAdmin para habilitar a Carga em Massa
 class FilialAdmin(ImportExportModelAdmin):
+    resource_classes = [FilialResource]
     list_display = ('id', 'nome', 'cnpj')
+    search_fields = ('nome',)
+
+
+class TomadorAdmin(ImportExportModelAdmin):
+    resource_classes = [TomadorResource]
+    list_display = ('id', 'nome')
     search_fields = ('nome',)
 
 
@@ -32,17 +81,14 @@ class FornecedorAdmin(admin.ModelAdmin):
     search_fields = ('razao_social', 'cnpj_cpf')
 
 
-# --- 2. REGISTRO DOS MODELOS NO PAINEL ADMIN ---
+# --- REGISTRO ---
 
-# Modelos Simples (sem customização extra)
 admin.site.register(Banco)
 admin.site.register(Empresa)
 admin.site.register(TipoServico)
 admin.site.register(MotivoAusencia)
-admin.site.register(Tomador)
-
-# Modelos que usam as classes customizadas
-admin.site.register(Colaborador, ColaboradorAdmin)  # Agora com Import/Export
-admin.site.register(Filial, FilialAdmin)  # Agora incluso e com Import/Export
+admin.site.register(Tomador, TomadorAdmin)
+admin.site.register(Colaborador, ColaboradorAdmin)
+admin.site.register(Filial, FilialAdmin)
 admin.site.register(Cliente, ClienteAdmin)
 admin.site.register(Fornecedor, FornecedorAdmin)

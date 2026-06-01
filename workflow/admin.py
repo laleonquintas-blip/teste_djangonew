@@ -180,7 +180,7 @@ class DespesaAdmin(admin.ModelAdmin):
             'all': ('css/admin_fixes.css',)
         }
 
-    list_display = ('id', 'tipo_badge', 'solicitante', 'fornecedor', 'valor_formatado', 'status_badge',
+    list_display = ('id', 'tipo_badge', 'solicitante', 'despesa_display', 'valor_formatado', 'status_badge',
                     'botao_detalhes')
     list_filter = ('tipo_lancamento', 'status', 'fornecedor')
     search_fields = ('id', 'fornecedor__razao_social', 'solicitante__first_name')
@@ -229,7 +229,7 @@ class DespesaAdmin(admin.ModelAdmin):
 
         filtro_base = Q(solicitante=user)
         if 'Administrativo' in grupos:
-            filtro_base |= Q(status='AGUARDANDO_ADM')
+            filtro_base |= Q(status='AGUARDANDO_ADM', lancamentoextra__administrativo=user)
 
         return qs.filter(filtro_base).distinct()
 
@@ -468,6 +468,13 @@ class DespesaAdmin(admin.ModelAdmin):
             })
         response.context_data['summary_data'] = summary
         return response
+
+    def despesa_display(self, obj):
+        if obj.tipo_lancamento == 'EXTRA' and obj.tomador:
+            return obj.tomador.nome
+        return obj.fornecedor.razao_social if obj.fornecedor else '-'
+
+    despesa_display.short_description = "Despesa"
 
     def valor_formatado(self, obj):
         return f"R$ {obj.valor}"
