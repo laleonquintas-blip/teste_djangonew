@@ -91,6 +91,48 @@
     display: block;
     margin-top: 4px;
     color: #3498db;
+    white-space: nowrap;
+}
+
+/* ── RESPONSIVO MOBILE (< 768px) ── */
+@media (max-width: 767px) {
+
+    /* Empilha label + campos verticalmente */
+    .form-group .row {
+        flex-wrap: wrap !important;
+    }
+
+    /* Label ocupa 100% da largura */
+    .form-group .row > label.col-sm-3 {
+        width: 100% !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        padding-top: 0;
+        font-weight: bold;
+    }
+
+    /* Cada fieldBox ocupa 100% */
+    .form-group .row > .fieldBox {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-right: 0 !important;
+        margin-bottom: 8px;
+    }
+
+    /* Label inline (ex: "a") ocupa linha inteira */
+    .form-group .row > label.col-auto {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        padding-left: 0;
+    }
+
+    /* Botão "Hoje" e atalhos de data não quebram letras */
+    .datetimeshortcuts a,
+    .datetimeshortcuts span {
+        white-space: nowrap !important;
+        display: inline-block !important;
+    }
 }
 
 /* 9. readonly (campo Tipo = "Solicitação") se comporta como input */
