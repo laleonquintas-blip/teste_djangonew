@@ -1,5 +1,47 @@
 /* static/css/admin_fixes.css */
 
+/* Tabela de prévia de importação (import_export) — modo claro */
+.import-preview table tbody tr,
+.import-preview table tbody tr td,
+#result_list tbody tr,
+#result_list tbody tr td {
+    background-color: #fff !important;
+    color: #212529 !important;
+}
+.import-preview table tbody tr:nth-child(even),
+#result_list tbody tr:nth-child(even) {
+    background-color: #f8f9fa !important;
+}
+.import-preview table tbody tr:hover,
+#result_list tbody tr:hover {
+    background-color: #e9ecef !important;
+}
+
+/* Overrides dark mode — sobrescreve as regras !important acima */
+body.dark-mode .import-preview table tbody tr,
+body.dark-mode .import-preview table tbody tr td,
+body.dark-mode #result_list tbody tr,
+body.dark-mode #result_list tbody tr td {
+    background-color: #1e2a3a !important;
+    color: #d0dce8 !important;
+}
+body.dark-mode .import-preview table tbody tr:nth-child(even),
+body.dark-mode #result_list tbody tr:nth-child(even),
+body.dark-mode #result_list tbody tr:nth-child(even) td {
+    background-color: #1a2535 !important;
+}
+body.dark-mode .import-preview table tbody tr:hover,
+body.dark-mode #result_list tbody tr:hover,
+body.dark-mode #result_list tbody tr:hover td {
+    background-color: #253549 !important;
+}
+body.dark-mode #result_list thead th,
+body.dark-mode #result_list thead tr {
+    background-color: #162030 !important;
+    color: #90b4ce !important;
+    border-color: #2d3f52 !important;
+}
+
 /* 1. Linha principal: flex com label fixo na esquerda */
 .form-group .row {
     display: flex !important;
@@ -74,6 +116,48 @@
     display: block;
     margin-top: 4px;
     color: #3498db;
+    white-space: nowrap;
+}
+
+/* ── RESPONSIVO MOBILE (< 768px) ── */
+@media (max-width: 767px) {
+
+    /* Empilha label + campos verticalmente */
+    .form-group .row {
+        flex-wrap: wrap !important;
+    }
+
+    /* Label ocupa 100% da largura */
+    .form-group .row > label.col-sm-3 {
+        width: 100% !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        padding-top: 0;
+        font-weight: bold;
+    }
+
+    /* Cada fieldBox ocupa 100% */
+    .form-group .row > .fieldBox {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-right: 0 !important;
+        margin-bottom: 8px;
+    }
+
+    /* Label inline (ex: "a") ocupa linha inteira */
+    .form-group .row > label.col-auto {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        padding-left: 0;
+    }
+
+    /* Botão "Hoje" e atalhos de data não quebram letras */
+    .datetimeshortcuts a,
+    .datetimeshortcuts span {
+        white-space: nowrap !important;
+        display: inline-block !important;
+    }
 }
 
 /* 9. readonly (campo Tipo = "Solicitação") se comporta como input */
@@ -88,3 +172,56 @@
     min-height: 36px;
     line-height: 1.5;
 }
+
+/* ── Rangefilter: remove ícone duplicado de calendário ── */
+#changelist-filter .admindatefilter .datetimeshortcuts {
+    display: none !important;
+}
+#changelist-filter .admindatefilter input[type="text"].vDateField {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.admindatefilter .controls {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 5px !important;
+    margin-bottom: 15px !important;
+    padding-top: 5px !important;
+}
+
+.admindatefilter .controls input[type="submit"],
+.admindatefilter .controls input[type="reset"] {
+    flex: 1 1 0 !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    padding: 8px 0 !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-weight: bold !important;
+    font-size: 11px !important;
+    cursor: pointer !important;
+    text-transform: uppercase !important;
+    color: white !important;
+    margin: 0 !important;
+}
+
+.admindatefilter .controls input[type="submit"] {
+    background-color: #007bff !important;
+}
+
+.admindatefilter .controls input[type="reset"] {
+    background-color: #6c757d !important;
+}
+
+.admindatefilter .controls input[type="submit"]:hover { background-color: #0056b3 !important; }
+.admindatefilter .controls input[type="reset"]:hover  { background-color: #545b62 !important; }
+// static/js/admin_custom.js
+
+document.addEventListener('DOMContentLoaded', function () {
+    // Remove o width:48% inline que o rangefilter injeta no botão Pesquisar
+    document.querySelectorAll('.admindatefilter .controls input[type="submit"]').forEach(function (btn) {
+        btn.style.removeProperty('width');
+    });
+});

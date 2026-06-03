@@ -7,14 +7,155 @@ from django import forms
 from django.utils import timezone
 from django.contrib.auth.models import Group
 
-from .models import Despesa, LogWorkflow
+from rangefilter.filters import DateRangeFilterBuilder
+
+from .models import Despesa, LogWorkflow, STATUS_WORKFLOW
 from financeiro.models import ContasAPagar
 from core.models import UsuarioCustomizado
+
+
+# Filtros de texto ocultos para a barra de pesquisa customizada
+class _WfTextFilter(admin.SimpleListFilter):
+    def lookups(self, request, model_admin): return ()
+    def choices(self, changelist): return []
+    def has_output(self): return True
+    def queryset(self, request, queryset): return queryset
+
+
+class WfIdFilter(_WfTextFilter):
+    title = 'ID'; parameter_name = 'id_q'
+    def queryset(self, request, queryset):
+        if self.value():
+            try: return queryset.filter(id=int(self.value()))
+            except ValueError: return queryset.none()
+
+
+class WfSolicitanteFilter(_WfTextFilter):
+    title = 'Solicitante'; parameter_name = 'sol_q'
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(
+                solicitante__first_name__icontains=self.value()
+            ) | queryset.filter(
+                solicitante__last_name__icontains=self.value()
+            ) | queryset.filter(
+                solicitante__username__icontains=self.value()
+            )
+
+
+class WfDespesaFilter(_WfTextFilter):
+    title = 'Despesa'; parameter_name = 'desp_q'
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(fornecedor__razao_social__icontains=self.value())
+
+
+# ---------------------------------------------------------------------------
+# Mapa de ações por perfil/status → escolhas amigáveis no select de status
+# ---------------------------------------------------------------------------
+def _build_action_choices(grupos, status_atual, tipo_lancamento=None):
+    """
+    Retorna as choices do campo status de acordo com o perfil do usuário
+    e o status atual do registro.  A primeira opção é sempre "sem ação"
+    (mantém o status atual), forçando o usuário a escolher explicitamente
+    uma ação.
+    """
+    from .models import STATUS_WORKFLOW
+    labels = dict(STATUS_WORKFLOW)
+
+    # Placeholder: força o usuário a escolher explicitamente uma ação.
+    # Se salvar sem trocar, o clean() preserva o status atual.
+    sem_acao = ('', '— Selecione uma ação —')
+
+    # ── Sem registro (tela de criação): status auto-definido em save_model
+    if not status_atual:
+        return [('', '(definido automaticamente)')]
+
+    # ── Comercial ─────────────────────────────────────────────────────────
+    if 'Comercial' in grupos and status_atual == 'AGUARDANDO_COMERCIAL':
+        return [
+            sem_acao,
+            ('AGUARDANDO_FIN', '✅ Aprovar'),
+            ('CANCELADO',      '❌ Cancelar'),
+        ]
+
+    # ── Administrativo ────────────────────────────────────────────────────
+    if 'Administrativo' in grupos and status_atual == 'AGUARDANDO_ADM':
+        # Caixinhas vão direto ao Financeiro; Solicitações/Extras passam pelo RH
+        proximo       = 'AGUARDANDO_FIN' if tipo_lancamento == 'CAIXINHA' else 'AGUARDANDO_RH'
+        label_aprovar = '✅ Reenviar ao Financeiro' if tipo_lancamento == 'CAIXINHA' else '✅ Aprovar'
+        return [
+            sem_acao,
+            (proximo,  label_aprovar),
+            ('CANCELADO', '❌ Cancelar'),
+        ]
+
+    # ── Comercial (caixinha devolvida pelo Financeiro) ─────────────────────
+    if 'Comercial' in grupos and status_atual == 'AGUARDANDO_ADM':
+        return [
+            sem_acao,
+            ('AGUARDANDO_FIN', '✅ Reenviar ao Financeiro'),
+            ('CANCELADO',      '❌ Cancelar'),
+        ]
+
+    # ── Aprovador RH ──────────────────────────────────────────────────────
+    if 'Aprovador RH' in grupos and status_atual == 'AGUARDANDO_RH':
+        return [
+            sem_acao,
+            ('AGUARDANDO_FIN', '✅ Aprovar'),
+            ('AGUARDANDO_ADM', '↩ Retornar ao Administrativo'),
+            ('CANCELADO',      '❌ Cancelar'),
+        ]
+
+    # ── Aprovador Financeiro ───────────────────────────────────────────────
+    if 'Aprovador Financeiro' in grupos:
+        # Caixinha não passa pelo RH: devolução vai ao solicitante (AGUARDANDO_ADM)
+        destino_devolucao_fin = 'AGUARDANDO_ADM' if tipo_lancamento == 'CAIXINHA' else 'AGUARDANDO_RH'
+        label_devolucao_fin   = '↩ Devolver ao Solicitante' if tipo_lancamento == 'CAIXINHA' else '↩ Devolver ao RH'
+
+        # De DIRECIONADO_OP, desfaz o direcionamento retornando à própria fila do Financeiro
+        # (ou ao solicitante no caso de caixinha)
+        destino_devolucao_op = 'AGUARDANDO_ADM' if tipo_lancamento == 'CAIXINHA' else 'AGUARDANDO_FIN'
+        label_devolucao_op   = '↩ Devolver ao Solicitante' if tipo_lancamento == 'CAIXINHA' else '↩ Cancelar Direcionamento'
+
+        if status_atual == 'AGUARDANDO_FIN':
+            return [
+                sem_acao,
+                ('DIRECIONADO_OP',    'Direcionar ao Operador'),
+                ('PAGO',              '✅ Marcar como Pago'),
+                (destino_devolucao_fin, label_devolucao_fin),
+                ('CANCELADO',         '❌ Cancelar'),
+            ]
+        if status_atual == 'DIRECIONADO_OP':
+            return [
+                sem_acao,
+                ('PAGO',               '✅ Marcar como Pago'),
+                (destino_devolucao_op, label_devolucao_op),
+                ('CANCELADO',          '❌ Cancelar'),
+            ]
+
+    # ── Operador ──────────────────────────────────────────────────────────
+    if 'Operador' in grupos and status_atual == 'DIRECIONADO_OP':
+        return [
+            sem_acao,
+            ('PAGO',           '✅ Marcar como Pago'),
+            ('AGUARDANDO_FIN', '↩ Devolver ao Financeiro'),
+            ('CANCELADO',      '❌ Cancelar'),
+        ]
+
+    # Fallback: somente visualização
+    return [(status_atual, labels.get(status_atual, status_atual))]
 
 
 # --- 1. FORMULÁRIO ---
 class DespesaForm(forms.ModelForm):
     tipo_reserva = forms.CharField(widget=forms.HiddenInput(), required=False)
+    mensagem = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Adicione uma mensagem ou resposta (opcional)…'}),
+        required=False,
+        label='Mensagem / Resposta',
+        help_text='Esta mensagem ficará registrada no histórico de diálogo.'
+    )
 
     class Meta:
         model = Despesa
@@ -22,6 +163,8 @@ class DespesaForm(forms.ModelForm):
         widgets = {
             'observacoes': forms.Textarea(attrs={'rows': 2}),
             'dados_bancarios_pagto': forms.Textarea(attrs={'rows': 3}),
+            'justificativa_retorno': forms.Textarea(attrs={'rows': 3}),
+            'motivo_cancelamento': forms.Textarea(attrs={'rows': 3}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -57,33 +200,14 @@ class DespesaForm(forms.ModelForm):
 
                 if self.instance.pk:
                     status_atual = self.instance.status
+                    self.fields['status'].choices = _build_action_choices(
+                        grupos_usuario,
+                        status_atual,
+                        tipo_lancamento=self.instance.tipo_lancamento,
+                    )
                 else:
-                    if tipo_real == 'EXTRA':
-                        status_atual = 'AGUARDANDO_ADM'
-                    elif tipo_real == 'CAIXINHA':
-                        status_atual = 'AGUARDANDO_FIN'
-                    else:
-                        status_atual = 'AGUARDANDO_RH'
-
-                regras_acesso = {
-                    'Administrativo': ['AGUARDANDO_ADM', 'AGUARDANDO_RH', 'CANCELADO'],
-                    'Aprovador RH': ['AGUARDANDO_RH', 'AGUARDANDO_FIN', 'CANCELADO'],
-                    'Aprovador Financeiro': ['AGUARDANDO_FIN', 'DIRECIONADO_OP', 'PAGO', 'CANCELADO'],
-                    'Operador': ['DIRECIONADO_OP', 'PAGO', 'CANCELADO'],
-                    'Solicitante': []
-                }
-
-                status_permitidos = set()
-                status_permitidos.add(status_atual)
-
-                for grupo in grupos_usuario:
-                    if grupo in regras_acesso:
-                        status_permitidos.update(regras_acesso[grupo])
-
-                todas_opcoes = list(self.fields['status'].choices)
-                self.fields['status'].choices = [
-                    (k, v) for k, v in todas_opcoes if k in status_permitidos
-                ]
+                    # Novo registro: status definido automaticamente em save_model
+                    pass
 
         campos_livres = [
             'data_despesa', 'fornecedor', 'valor', 'observacoes',
@@ -136,6 +260,12 @@ class DespesaForm(forms.ModelForm):
                             del self._errors[campo]
 
         status = cleaned_data.get('status')
+
+        # Se nenhuma ação foi selecionada (placeholder ''), preserva o status atual
+        if not status and self.instance.pk:
+            cleaned_data['status'] = self.instance.status
+            status = self.instance.status
+
         operador = cleaned_data.get('operador')
 
         if status == 'DIRECIONADO_OP' and not operador:
@@ -144,6 +274,22 @@ class DespesaForm(forms.ModelForm):
         motivo = cleaned_data.get('motivo_cancelamento')
         if status and 'CANCELADO' in str(status) and not motivo:
             self.add_error('motivo_cancelamento', 'Motivo obrigatório ao cancelar.')
+
+        # Justificativa obrigatória em devoluções/retornos
+        if self.instance.pk:
+            status_anterior = self.instance.status
+            tipo = self.instance.tipo_lancamento
+
+            # Qualquer transição "para trás" no fluxo exige justificativa
+            RETORNOS = {
+                'AGUARDANDO_RH':  {'AGUARDANDO_ADM'},
+                'AGUARDANDO_FIN': {'AGUARDANDO_ADM', 'AGUARDANDO_RH'},
+                'DIRECIONADO_OP': {'AGUARDANDO_ADM', 'AGUARDANDO_FIN'},
+            }
+            if status in RETORNOS.get(status_anterior, set()):
+                if not cleaned_data.get('justificativa_retorno'):
+                    self.add_error('justificativa_retorno',
+                                   'Justificativa obrigatória ao retornar/devolver.')
 
         # VALIDAÇÃO: bloqueia PAGO sem empresa e banco
         if status == 'PAGO':
@@ -162,8 +308,10 @@ class LogInline(admin.TabularInline):
     readonly_fields = ('usuario', 'perfil_usuario', 'acao', 'data_hora', 'observacao')
     extra = 0
     can_delete = False
-    verbose_name = "Histórico"
-    verbose_name_plural = "Histórico"
+    verbose_name = "Entrada"
+    verbose_name_plural = "Log de Ações (interno)"
+    # Oculto — o diálogo visual substitui esta tabela no change_form
+    classes = ['collapse']
 
 
 @admin.register(Despesa)
@@ -180,12 +328,20 @@ class DespesaAdmin(admin.ModelAdmin):
             'all': ('css/admin_fixes.css',)
         }
 
-    list_display = ('id', 'tipo_badge', 'solicitante', 'despesa_display', 'valor_formatado', 'status_badge',
-                    'botao_detalhes')
-    list_filter = ('tipo_lancamento', 'status', 'fornecedor')
+    list_display = ('id', 'tipo_badge', 'solicitante', 'despesa_display', 'valor_formatado',
+                    'data_solicitacao', 'hora_solicitacao', 'status_badge', 'botao_detalhes')
+    list_filter = (
+        'tipo_lancamento',
+        'status',
+        ('data_criacao', DateRangeFilterBuilder(title='Data da Solicitação')),
+        WfIdFilter,
+        WfSolicitanteFilter,
+        WfDespesaFilter,
+    )
     search_fields = ('id', 'fornecedor__razao_social', 'solicitante__first_name')
 
     CORES_SISTEMA = {
+        'AGUARDANDO_COMERCIAL': '#1abc9c',
         'AGUARDANDO_ADM': '#e67e22',
         'AGUARDANDO_RH': '#f39c12',
         'AGUARDANDO_FIN': '#3498db',
@@ -221,28 +377,45 @@ class DespesaAdmin(admin.ModelAdmin):
 
         grupos = list(user.groups.values_list('name', flat=True))
 
-        if 'Aprovador RH' in grupos and 'Aprovador Financeiro' not in grupos:
-            return qs.filter(tipo_lancamento='SOLICITACAO')
-
+        # Financeiro e Operador enxergam tudo
         if 'Aprovador Financeiro' in grupos or 'Operador' in grupos:
             return qs
 
+        # RH: seus próprios + solicitações/extras em AGUARDANDO_RH + já atuou
+        # Caixinhas de outros perfis nunca passam pelo RH
+        if 'Aprovador RH' in grupos:
+            return qs.filter(
+                Q(solicitante=user) |
+                Q(status='AGUARDANDO_RH', tipo_lancamento__in=['SOLICITACAO', 'EXTRA']) |
+                Q(logs__usuario=user)
+            ).distinct()
+
+        # Comercial: somente caixinhas feitas por ele
+        if 'Comercial' in grupos:
+            return qs.filter(solicitante=user, tipo_lancamento='CAIXINHA')
+
+        # Administrativo: seus próprios registros + extras direcionados a ele
         filtro_base = Q(solicitante=user)
         if 'Administrativo' in grupos:
-            filtro_base |= Q(status='AGUARDANDO_ADM', lancamentoextra__administrativo=user)
+            filtro_base |= Q(lancamentoextra__administrativo=user)
 
         return qs.filter(filtro_base).distinct()
 
     # --- CAMPOS TRAVADOS (READONLY) ---
     def get_readonly_fields(self, request, obj=None):
-        ro_fields = ['tipo_lancamento', 'data_ultima_alteracao']
+        ro_fields = ['tipo_lancamento', 'data_ultima_alteracao', 'dialogo_display']
+
+        # Novo registro para usuário comum: status é auto-definido, exibe só-leitura
+        if not obj and not request.user.is_superuser:
+            ro_fields.append('status')
+            return ro_fields
 
         if obj:
             user = request.user
             grupos = list(user.groups.values_list('name', flat=True))
 
             if user.is_superuser:
-                return []
+                return ['dialogo_display']  # campo calculado, sempre readonly
 
             if not self.has_change_permission(request, obj):
                 return [f.name for f in self.model._meta.fields]
@@ -305,22 +478,61 @@ class DespesaAdmin(admin.ModelAdmin):
                 )
             }))
 
+        # ── Aba "Aprovação / Execução" ─────────────────────────────────────────
         pode_ver_pagamento = (user.is_superuser or 'Aprovador Financeiro' in grupos or 'Operador' in grupos)
-        is_aprovador = any(g in grupos for g in ['Aprovador Financeiro', 'Aprovador RH', 'Operador', 'Administrativo'])
+        is_aprovador = any(g in grupos for g in [
+            'Aprovador Financeiro', 'Aprovador RH', 'Operador', 'Administrativo', 'Comercial'
+        ])
+
+        # ── Tela de CRIAÇÃO (novo registro) ───────────────────────────────────
+        if not obj and not user.is_superuser:
+            fieldsets.append(('Aprovação / Execução', {
+                'fields': (),
+                'description': mark_safe(
+                    'O status será definido automaticamente ao salvar:<br>'
+                    '<ul style="margin:8px 0 0 20px">'
+                    '<li><strong>Caixinha</strong> → Aguardando Financeiro</li>'
+                    '<li><strong>Solicitação</strong> → Aguardando RH</li>'
+                    '<li><strong>Extra</strong> → Aguardando Administrativo</li>'
+                    '</ul>'
+                ),
+            }))
+            return fieldsets
 
         campos_aprovacao = ['status']
 
-        if user.is_superuser or 'Aprovador Financeiro' in grupos or 'Operador' in grupos:
-            campos_aprovacao.append('operador')
+        # Campos extras só fazem sentido em registros existentes
+        if obj:
+            pode_editar = user.is_superuser or self.has_change_permission(request, obj)
 
-        if user.is_superuser or is_aprovador:
+            if user.is_superuser or 'Aprovador Financeiro' in grupos or 'Operador' in grupos:
+                campos_aprovacao.append('operador')
+
             if pode_ver_pagamento:
                 campos_aprovacao.append(('empresa_pagadora', 'banco_pagador'))
-            campos_aprovacao.append('motivo_cancelamento')
+
+            # Motivo cancelamento e justificativa: apenas para quem pode agir
+            if pode_editar:
+                campos_aprovacao.append('motivo_cancelamento')
+
+                pode_retornar = any(g in grupos for g in [
+                    'Aprovador RH', 'Aprovador Financeiro', 'Operador'
+                ])
+                if user.is_superuser or pode_retornar:
+                    campos_aprovacao.append('justificativa_retorno')
+
+                # Campo mensagem livre para qualquer parte do fluxo responder
+                campos_aprovacao.append('mensagem')
 
         fieldsets.append(('Aprovação / Execução', {
             'fields': tuple(campos_aprovacao)
         }))
+
+        # ── Aba "Histórico / Diálogo" ──────────────────────────────────────
+        if obj:
+            fieldsets.append(('Histórico / Diálogo', {
+                'fields': ('dialogo_display',),
+            }))
 
         return fieldsets
 
@@ -334,22 +546,46 @@ class DespesaAdmin(admin.ModelAdmin):
 
         grupos = list(user.groups.values_list('name', flat=True))
 
-        if 'Administrativo' in grupos and obj.status == 'AGUARDANDO_ADM':
+        # Usa sempre o status e tipo gravados no banco, não o valor em memória
+        # (que pode ter sido modificado pelo POST antes da validação falhar)
+        db_vals = Despesa.objects.filter(pk=obj.pk).values('status', 'tipo_lancamento').first()
+        if db_vals:
+            obj_status = db_vals['status']
+            obj_tipo   = db_vals['tipo_lancamento']
+        else:
+            obj_status = obj.status
+            obj_tipo   = obj.tipo_lancamento
+
+        # Comercial: suas caixinhas (inclui devolvidas pelo Financeiro)
+        if 'Comercial' in grupos and obj_tipo == 'CAIXINHA':
+            if obj.solicitante == user and obj_status in ['AGUARDANDO_COMERCIAL', 'AGUARDANDO_ADM']:
+                return True
+
+        # Administrativo: seus próprios ao AGUARDANDO_ADM + extras direcionados a ele
+        if 'Administrativo' in grupos and obj_status == 'AGUARDANDO_ADM':
             if obj.solicitante == user:
                 return True
+            try:
+                if obj.lancamentoextra and obj.lancamentoextra.administrativo == user:
+                    return True
+            except Exception:
+                pass
 
-        if 'Aprovador RH' in grupos and obj.status == 'AGUARDANDO_RH':
+        # RH: apenas SOLICITACAO e EXTRA em AGUARDANDO_RH (caixinha não passa pelo RH)
+        if 'Aprovador RH' in grupos and obj_status == 'AGUARDANDO_RH':
+            if obj_tipo in ['SOLICITACAO', 'EXTRA']:
+                return True
+
+        # Financeiro
+        if 'Aprovador Financeiro' in grupos:
+            if obj_status in ['AGUARDANDO_FIN', 'DIRECIONADO_OP']:
+                return True
+
+        # Operador
+        if 'Operador' in grupos and obj_status == 'DIRECIONADO_OP':
             return True
 
-        if 'Aprovador Financeiro' in grupos:
-            if obj.status in ['AGUARDANDO_FIN', 'DIRECIONADO_OP']:
-                return True
-
-        if 'Operador' in grupos:
-            if obj.status == 'DIRECIONADO_OP':
-                return True
-
-        if obj.solicitante == user and obj.status == 'RASCUNHO':
+        if obj.solicitante == user and obj_status == 'RASCUNHO':
             return True
 
         return False
@@ -370,16 +606,44 @@ class DespesaAdmin(admin.ModelAdmin):
             if form.cleaned_data.get('tipo_lancamento'):
                 obj.tipo_lancamento = form.cleaned_data['tipo_lancamento']
 
+            grupos_user = list(request.user.groups.values_list('name', flat=True))
+
             if obj.tipo_lancamento == 'EXTRA':
+                # EXTRA sempre começa no Administrativo (criado por outro perfil)
                 obj.status = 'AGUARDANDO_ADM'
             elif obj.tipo_lancamento == 'CAIXINHA':
+                # Qualquer perfil que crie uma caixinha já aprova na criação
                 obj.status = 'AGUARDANDO_FIN'
-            else:
-                obj.status = 'AGUARDANDO_RH'
+            else:  # SOLICITACAO
+                if 'Aprovador RH' in grupos_user:
+                    # RH não aprova o próprio pedido — vai direto ao Financeiro
+                    obj.status = 'AGUARDANDO_FIN'
+                else:
+                    obj.status = 'AGUARDANDO_RH'
 
             acao_log = "Criou Registro"
         else:
-            acao_log = "Editou"
+            # Detecta ação específica pelo status novo
+            status_novo = obj.status
+            if status_novo == 'AGUARDANDO_RH' and 'status' in form.changed_data:
+                acao_log = "Aprovou → RH"
+            elif status_novo == 'AGUARDANDO_FIN' and 'status' in form.changed_data:
+                grupos_user = list(request.user.groups.values_list('name', flat=True))
+                if 'Operador' in grupos_user:
+                    acao_log = "Devolveu ao Financeiro"
+                else:
+                    acao_log = "Aprovou → Financeiro"
+            elif status_novo == 'AGUARDANDO_ADM' and 'status' in form.changed_data:
+                acao_log = "Retornou ao Administrativo"
+            elif status_novo == 'DIRECIONADO_OP' and 'status' in form.changed_data:
+                acao_log = "Direcionou ao Operador"
+            elif status_novo == 'PAGO' and 'status' in form.changed_data:
+                acao_log = "FINALIZOU (PAGO)"
+            elif status_novo == 'CANCELADO' and 'status' in form.changed_data:
+                acao_log = "CANCELOU"
+            else:
+                acao_log = "Editou"
+
             if obj.tipo_lancamento == 'EXTRA' and obj.status == 'CANCELADO':
                 if request.user.groups.filter(name='Aprovador Financeiro').exists():
                     try:
@@ -394,7 +658,6 @@ class DespesaAdmin(admin.ModelAdmin):
 
         if change and obj.status == 'PAGO' and 'status' in form.changed_data:
             self.gerar_contas_a_pagar(obj, request)
-            acao_log = "FINALIZOU (PAGO)"
 
         super().save_model(request, obj, form, change)
 
@@ -408,12 +671,24 @@ class DespesaAdmin(admin.ModelAdmin):
             perfil = "RH"
         elif 'Administrativo' in grupos:
             perfil = "Administrativo"
+        elif 'Comercial' in grupos:
+            perfil = "Comercial"
 
         obs = f"Status: {obj.get_status_display()}"
         if obj.operador:
-            obs += f" -> {obj.operador.first_name}"
+            obs += f" → {obj.operador.first_name}"
         if 'valor' in form.changed_data:
-            obs += f" | Alterou Valor para R$ {obj.valor}"
+            obs += f" | Valor alterado para R$ {obj.valor}"
+
+        # Questionamento / justificativa de retorno
+        justificativa = form.cleaned_data.get('justificativa_retorno', '').strip()
+        if justificativa and 'justificativa_retorno' in form.changed_data:
+            obs += f"\n[QUESTIONAMENTO] {justificativa}"
+
+        # Mensagem livre adicionada pelo usuário
+        mensagem_livre = form.cleaned_data.get('mensagem', '').strip()
+        if mensagem_livre:
+            obs += f"\n[MENSAGEM] {mensagem_livre}"
 
         LogWorkflow.objects.create(
             despesa=obj,
@@ -447,7 +722,15 @@ class DespesaAdmin(admin.ModelAdmin):
             )
 
     def changelist_view(self, request, extra_context=None):
-        response = super().changelist_view(request, extra_context)
+        extra = extra_context or {}
+        extra['status_choices'] = STATUS_WORKFLOW
+        extra['solicitantes_opts'] = list(
+            UsuarioCustomizado.objects.filter(solicitacoes__isnull=False)
+            .values_list('id', 'first_name', 'last_name').distinct().order_by('first_name')
+        )
+        response = super().changelist_view(request, extra_context=extra)
+        if not hasattr(response, 'context_data'):
+            return response
         try:
             qs = response.context_data['cl'].queryset
         except (AttributeError, KeyError):
@@ -512,3 +795,79 @@ class DespesaAdmin(admin.ModelAdmin):
         return mark_safe(f'<a class="button" href="{obj.id}/change/">🔎 Ver</a>')
 
     botao_detalhes.short_description = "Ação"
+
+    def data_solicitacao(self, obj):
+        if obj.data_criacao:
+            from django.utils import timezone as tz
+            local = tz.localtime(obj.data_criacao)
+            return local.strftime('%d/%m/%Y')
+        return '—'
+
+    data_solicitacao.short_description = "Data"
+    data_solicitacao.admin_order_field = 'data_criacao'
+
+    def hora_solicitacao(self, obj):
+        if obj.data_criacao:
+            from django.utils import timezone as tz
+            local = tz.localtime(obj.data_criacao)
+            return local.strftime('%H:%M')
+        return '—'
+
+    hora_solicitacao.short_description = "Hora"
+    hora_solicitacao.admin_order_field = 'data_criacao'
+
+    def dialogo_display(self, obj):
+        """Exibe o histórico de ações como um diálogo cronológico."""
+        if not obj or not obj.pk:
+            return '—'
+        logs = obj.logs.order_by('data_hora')
+        if not logs.exists():
+            return '—'
+
+        CORES_PERFIL = {
+            'Administrativo': '#e67e22',
+            'RH':             '#f39c12',
+            'Financeiro':     '#3498db',
+            'Operador':       '#9b59b6',
+            'Comercial':      '#1abc9c',
+            'Admin':          '#2c3e50',
+            'Solicitante':    '#7f8c8d',
+        }
+
+        html = '<div style="display:flex;flex-direction:column;gap:12px;padding:8px 0;">'
+        for log in logs:
+            from django.utils import timezone as tz
+            dt = tz.localtime(log.data_hora).strftime('%d/%m/%Y %H:%M')
+            cor = CORES_PERFIL.get(log.perfil_usuario, '#95a5a6')
+            nome = log.usuario.get_full_name() or log.usuario.username
+
+            # Separa linhas de observação
+            obs_raw = log.observacao or ''
+            linhas = obs_raw.split('\n')
+            status_line = linhas[0] if linhas else ''
+            extras = [l for l in linhas[1:] if l.strip()]
+
+            corpo = f'<span style="font-size:12px;color:#555;">{status_line}</span>'
+            for extra in extras:
+                if extra.startswith('[QUESTIONAMENTO]'):
+                    texto = extra.replace('[QUESTIONAMENTO]', '').strip()
+                    corpo += f'<div style="margin-top:6px;background:#fff3cd;border-left:3px solid #f39c12;padding:6px 10px;border-radius:4px;"><strong>❓ Questionamento:</strong> {texto}</div>'
+                elif extra.startswith('[MENSAGEM]'):
+                    texto = extra.replace('[MENSAGEM]', '').strip()
+                    corpo += f'<div style="margin-top:6px;background:#d4edda;border-left:3px solid #28a745;padding:6px 10px;border-radius:4px;"><strong>💬 Mensagem:</strong> {texto}</div>'
+
+            html += f'''
+            <div style="border-left:4px solid {cor};padding:8px 12px;background:#fafafa;border-radius:0 6px 6px 0;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span style="background:{cor};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold;">{log.perfil_usuario}</span>
+                    <strong style="font-size:13px;">{nome}</strong>
+                    <span style="font-size:11px;color:#888;">{dt}</span>
+                    <span style="margin-left:auto;font-size:11px;font-style:italic;color:#666;">{log.acao}</span>
+                </div>
+                {corpo}
+            </div>'''
+
+        html += '</div>'
+        return mark_safe(html)
+
+    dialogo_display.short_description = "Histórico de Diálogo"

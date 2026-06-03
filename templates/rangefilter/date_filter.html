@@ -1,0 +1,123 @@
+{% load i18n rangefilter_compat %}
+<details data-filter-title="{{ title }}" open>
+<summary>{% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}</summary>
+<link rel="stylesheet" type="text/css" href="{% static 'admin/css/widgets.css' %}">
+<style nonce="{{ spec.request.csp_nonce }}">
+    {% default_css_vars_if_needed %}
+    .admindatefilter .button,
+    .admindatefilter input[type=submit],
+    .admindatefilter input[type=button],
+    .admindatefilter input[type=reset] {
+        background: var(--button-bg);
+        padding: 4px 5px;
+        border: none;
+        border-radius: 4px;
+        color: var(--button-fg);
+        cursor: pointer;
+    }
+    .admindatefilter {
+        margin: 5px 0;
+        padding: 0 15px 15px;
+        border-bottom: 1px solid var(--hairline-color);
+    }
+    .admindatefilter:last-child { border-bottom: none; }
+    .admindatefilter .timezonewarning { display: none; }
+
+    /* Cada linha de data: input + ícone calendário lado a lado */
+    .admindatefilter p {
+        padding-left: 0;
+        line-height: normal;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 4px;
+    }
+    .admindatefilter p.datetime { line-height: normal; }
+
+    /* Ícone calendário: junto ao campo, sem sobreposição */
+    .admindatefilter .datetimeshortcuts {
+        display: inline-flex !important;
+        align-items: center;
+        position: static !important;
+        float: none !important;
+        padding: 0 !important;
+        font-size: 0 !important; /* esconde o "|" separador de texto */
+    }
+    /* Esconde o link "Hoje" */
+    .admindatefilter .datetimeshortcuts a:first-child {
+        display: none !important;
+    }
+    /* Mantém o ícone de calendário (imagem não é afetada por font-size) */
+    .admindatefilter .datetimeshortcuts a {
+        color: #999;
+        position: static !important;
+        padding: 0 !important;
+        line-height: 1;
+    }
+
+    .calendarbox { z-index: 1100; }
+    .clockbox { z-index: 1100; margin-left: -8em !important; margin-top: 5em !important; }
+    @media (min-width: 768px) { .calendarbox { margin-left: -16em !important; margin-top: 9em !important; } }
+    @media (max-width: 767px) { .calendarbox { overflow: visible; } }
+</style>
+
+<script type="text/javascript" src="{% url 'admin:jsi18n' %}"></script>
+<script type="text/javascript" nonce="{{ spec.request.csp_nonce }}">
+    django.jQuery('document').ready(function () {
+        django.jQuery('.admindatefilter #{{ choices.0.system_name }}-form input[type="submit"]').click(function(event) {
+            event.preventDefault();
+            var form = django.jQuery(this).closest('div.admindatefilter').find('form');
+            var query_string = django.jQuery('input#{{ choices.0.system_name }}-query-string').val();
+            var form_data = form.serialize();
+            var amp = query_string === "?" ? "" : "&";
+            window.location = window.location.pathname + query_string + amp + form_data;
+        });
+
+        django.jQuery('.admindatefilter #{{ choices.0.system_name }}-form input[type="reset"]').click(function() {
+            var form = django.jQuery(this).closest('div.admindatefilter').find('form');
+            var query_string = form.find('input#{{ choices.0.system_name }}-query-string').val();
+            window.location = window.location.pathname + query_string;
+        });
+    });
+
+    function embedScript(url) {
+        return new Promise(function pr(resolve, reject) {
+            var newScript = document.createElement("script");
+            newScript.type = "text/javascript";
+            newScript.src = url;
+            newScript.onload = resolve;
+            if ("{{ spec.request.csp_nonce }}" !== "") {
+                newScript.setAttribute("nonce", "{{ spec.request.csp_nonce }}");
+            }
+            document.head.appendChild(newScript);
+        });
+    }
+
+    django.jQuery(window).on('load', function () {
+        if (!('DateTimeShortcuts' in window)) {
+            var promiseList = [];
+            {% for m in spec.form.js %}
+                promiseList.push(embedScript("{{ m }}"));
+            {% endfor %}
+            Promise.all(promiseList).then(function() {
+                if ('DateTimeShortcuts' in window) {
+                    window.DateTimeShortcuts.init();
+                }
+            });
+        }
+    });
+</script>
+{% block quick-select-choices %}{% endblock %}
+<div class="admindatefilter">
+    <form method="GET" action="." id="{{ choices.0.system_name }}-form">
+        {{ spec.form.as_p }}
+        {% for choice in choices %}
+            <input type="hidden" id="{{ choice.system_name }}-query-string" value="{{ choice.query_string }}">
+        {% endfor %}
+        <div class="controls">
+            <input type="submit" class="button" value="{% trans "Search" %}">
+            <input type="reset" class="button" value="{% trans "Reset" %}">
+        </div>
+    </form>
+</div>
+</details>

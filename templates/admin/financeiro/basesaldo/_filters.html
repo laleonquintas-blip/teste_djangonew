@@ -1,0 +1,66 @@
+<div class="cfb-wrap">
+    <div class="cfb-title">Filtros</div>
+    <div class="cfb-row">
+
+        <div class="cfb-field cfb-date-range" style="flex:2;min-width:260px;">
+            <div class="cfb-sub">
+                <label>Data da Baixa De</label>
+                <input type="date" id="cfb_baixa_ini" data-cfb-param="data_baixa__range__gte">
+            </div>
+            <span class="cfb-sep">até</span>
+            <div class="cfb-sub"><label>&nbsp;</label>
+                <input type="date" id="cfb_baixa_fim" data-cfb-param="data_baixa__range__lte">
+            </div>
+        </div>
+
+        <div class="cfb-field" style="flex:2;min-width:200px;">
+            <label>Nome (Forn/Cli)</label>
+            <input type="text" id="cfb_nome" data-cfb-param="nome_q" placeholder="Buscar por nome...">
+        </div>
+
+        <div class="cfb-field" style="min-width:160px;">
+            <label>Empresa</label>
+            <select id="cfb_empresa" data-cfb-param="empresa">
+                <option value="">— Todas —</option>
+                {% for emp in empresas_opts %}<option value="{{ emp }}">{{ emp }}</option>{% endfor %}
+            </select>
+        </div>
+
+        <div class="cfb-field" style="min-width:150px;">
+            <label>Banco</label>
+            <select id="cfb_banco" data-cfb-param="banco">
+                <option value="">— Todos —</option>
+                {% for b in bancos_opts %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
+            </select>
+        </div>
+
+        <div class="cfb-field" style="min-width:110px;">
+            <label>Origem</label>
+            <select id="cfb_origem" data-cfb-param="origem">
+                <option value="">— Todas —</option>
+                {% for o in origens_opts %}<option value="{{ o }}">{{ o }}</option>{% endfor %}
+            </select>
+        </div>
+
+        <div class="cfb-field" style="min-width:140px;">
+            <label>Usuário que Baixou</label>
+            <select id="cfb_usuario" data-cfb-param="usuario_q">
+                <option value="">— Todos —</option>
+                {% for u in usuarios_opts %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+            </select>
+        </div>
+
+    </div>
+    <div class="cfb-actions" style="margin-top:10px;">
+        <button type="button" class="cfb-btn cfb-btn-search" onclick="cfbApply({
+            'data_baixa__range__gte': cfbVal('cfb_baixa_ini'),
+            'data_baixa__range__lte': cfbVal('cfb_baixa_fim'),
+            nome_q:    cfbVal('cfb_nome'),
+            empresa:   cfbVal('cfb_empresa'),
+            banco:     cfbVal('cfb_banco'),
+            origem:    cfbVal('cfb_origem'),
+            usuario_q: cfbVal('cfb_usuario')
+        })">🔍 Pesquisar</button>
+        <button type="button" class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
+    </div>
+</div>

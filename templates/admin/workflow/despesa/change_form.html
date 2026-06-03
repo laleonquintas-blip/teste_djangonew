@@ -121,16 +121,34 @@
 
             // CONFIGURAÇÕES
             const ID_STATUS = 'id_status';
-            const CLASSE_LINHA_OPERADOR = 'field-operador';
-            const VALOR_GATILHO_OPERADOR = 'DIRECIONADO_OP';
-            const STATUS_PROIBIDOS = ['RASCUNHO']; // Lista negra
+            const CLASSE_LINHA_OPERADOR      = 'field-operador';
+            const CLASSE_LINHA_MOTIVO        = 'field-motivo_cancelamento';
+            const CLASSE_LINHA_JUSTIFICATIVA = 'field-justificativa_retorno';
+            const VALOR_GATILHO_OPERADOR     = 'DIRECIONADO_OP';
+            const STATUS_PROIBIDOS           = ['RASCUNHO'];
+
+            // Status e tipo gravados no banco (para detectar "retorno")
+            const STATUS_ATUAL_DB    = "{{ original.status|default:'' }}";
+            const TIPO_LANCAMENTO_DB = "{{ original.tipo_lancamento|default:'' }}";
+
+            // Mapa: status_anterior → status que caracteriza um retorno/devolução
+            // Para caixinha, Financeiro e Operador devolvem ao solicitante (AGUARDANDO_ADM)
+            const ehCaixinha = TIPO_LANCAMENTO_DB === 'CAIXINHA';
+            const RETORNOS = {
+                'AGUARDANDO_RH':  'AGUARDANDO_ADM',
+                'AGUARDANDO_FIN': ehCaixinha ? 'AGUARDANDO_ADM' : 'AGUARDANDO_RH',
+                'DIRECIONADO_OP': ehCaixinha ? 'AGUARDANDO_ADM' : 'AGUARDANDO_FIN',
+            };
+
+            function getStatusSelect() {
+                var s = document.getElementById(ID_STATUS);
+                return s || document.querySelector('select[name="status"]');
+            }
 
             // 1. VISIBILIDADE CAMPO OPERADOR
             function verificarVisualizacao() {
-                var campoStatus = document.getElementById(ID_STATUS);
-                if (!campoStatus) campoStatus = document.querySelector('select[name="status"]');
+                var campoStatus = getStatusSelect();
                 var linhaOperador = document.getElementsByClassName(CLASSE_LINHA_OPERADOR)[0];
-
                 if (!campoStatus || !linhaOperador) return;
 
                 if (campoStatus.value === VALOR_GATILHO_OPERADOR) {
@@ -140,18 +158,47 @@
                 }
             }
 
-            // 2. LIMPEZA DE OPÇÕES
-            function limparStatusIndesejados() {
-                var campoStatus = document.getElementById(ID_STATUS);
-                if (!campoStatus) campoStatus = document.querySelector('select[name="status"]');
+            // 2. VISIBILIDADE CAMPO MOTIVO CANCELAMENTO
+            function verificarMotivoCancelamento() {
+                var campoStatus = getStatusSelect();
+                var linhaMotivo = document.getElementsByClassName(CLASSE_LINHA_MOTIVO)[0];
+                if (!campoStatus || !linhaMotivo) return;
 
+                if (campoStatus.value && campoStatus.value.indexOf('CANCELADO') !== -1) {
+                    linhaMotivo.style.display = '';
+                } else {
+                    linhaMotivo.style.display = 'none';
+                    var t = linhaMotivo.querySelector('textarea, input[type="text"]');
+                    if (t) t.value = '';
+                }
+            }
+
+            // 3. VISIBILIDADE CAMPO JUSTIFICATIVA (retorno/devolução)
+            function verificarJustificativa() {
+                var campoStatus = getStatusSelect();
+                var linhaJust = document.getElementsByClassName(CLASSE_LINHA_JUSTIFICATIVA)[0];
+                if (!campoStatus || !linhaJust) return;
+
+                var statusSelecionado = campoStatus.value;
+                var ehRetorno = STATUS_ATUAL_DB && RETORNOS[STATUS_ATUAL_DB] === statusSelecionado;
+
+                if (ehRetorno) {
+                    linhaJust.style.display = '';
+                } else {
+                    linhaJust.style.display = 'none';
+                    var t = linhaJust.querySelector('textarea, input[type="text"]');
+                    if (t) t.value = '';
+                }
+            }
+
+            // 4. LIMPEZA DE OPÇÕES PROIBIDAS
+            function limparStatusIndesejados() {
+                var campoStatus = getStatusSelect();
                 if (campoStatus && campoStatus.options) {
                     for (var i = campoStatus.options.length - 1; i >= 0; i--) {
                         var valorOpcao = campoStatus.options[i].value;
-                        if (STATUS_PROIBIDOS.includes(valorOpcao)) {
-                            if (campoStatus.value !== valorOpcao) {
-                                campoStatus.remove(i);
-                            }
+                        if (STATUS_PROIBIDOS.includes(valorOpcao) && campoStatus.value !== valorOpcao) {
+                            campoStatus.remove(i);
                         }
                     }
                 }
@@ -159,8 +206,14 @@
 
             // --- EXECUÇÃO ---
             limparStatusIndesejados();
-            setInterval(function() { verificarVisualizacao(); }, 300);
+            setInterval(function() {
+                verificarVisualizacao();
+                verificarMotivoCancelamento();
+                verificarJustificativa();
+            }, 300);
             verificarVisualizacao();
+            verificarMotivoCancelamento();
+            verificarJustificativa();
         });
     </script>
 {% endblock %}

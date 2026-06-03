@@ -2,80 +2,182 @@
 
 {% block extrastyle %}
 {{ block.super }}
-<style type="text/css">
-    /* =========================================================
-       CSS DEFINITIVO (INJETADO NO HTML)
-       ========================================================= */
+<style>
+/* ── Ocultar botão customizar (control-sidebar) ─────────────────────────── */
+.nav-item:has([data-widget="control-sidebar"]) { display: none !important; }
 
-    /* 1. MATAR O CAMPO FANTASMA (INPUT DE TEXTO)
-       Esconde qualquer input chamado 'q' na barra lateral. */
-    #changelist-filter input[name="q"] {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        padding: 0 !important;
-        border: none !important;
-        margin: 0 !important;
-    }
+/* ── Botão dark/light ────────────────────────────────────────────────────── */
+#theme-toggle-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 20px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 3px 14px;
+    margin: 7px 6px 0 0;
+    transition: background .2s, border-color .2s;
+    white-space: nowrap;
+}
+#theme-toggle-btn:hover {
+    background: rgba(255,255,255,.18);
+    border-color: rgba(255,255,255,.7);
+}
 
-    /* 2. REGRA GERAL: ESCONDER TODOS OS BOTÕES DE SUBMIT NA BARRA LATERAL
-       Isso garante que o botão "duplicado" (marcado com X) suma. */
-    #changelist-filter input[type="submit"] {
-        display: none !important;
-    }
-
-    /* 3. EXCEÇÃO: TRAZER DE VOLTA O BOTÃO DO FILTRO DE DATA
-       Aqui sobrescrevemos a regra 2 APENAS para o botão que está
-       dentro da classe .admindatefilter (o plugin de data). */
-    .admindatefilter .controls input[type="submit"],
-    .admindatefilter .controls button {
-        display: block !important;
-        width: 100% !important;
-        background-color: #007bff !important;
-        /* Azul */
-        color: white !important;
-        border: none !important;
-        padding: 8px !important;
-        border-radius: 4px !important;
-        font-weight: bold !important;
-        cursor: pointer !important;
-        text-transform: uppercase !important;
-        margin-top: 5px !important;
-        visibility: visible !important;
-    }
-
-    /* 4. ESTILIZAR O LINK 'LIMPAR'
-       Deixa ele com cara de botão azul turquesa. */
-    .admindatefilter .controls a {
-        display: block !important;
-        width: 100% !important;
-        text-align: center !important;
-        background-color: #17a2b8 !important;
-        /* Azul Turquesa */
-        color: white !important;
-        padding: 8px !important;
-        border-radius: 4px !important;
-        text-decoration: none !important;
-        font-weight: bold !important;
-        font-size: 11px !important;
-        margin-top: 5px !important;
-        visibility: visible !important;
-    }
-
-    /* 5. ARRUMAR LAYOUT DOS BOTÕES
-       Garante que fiquem alinhados e visíveis. */
-    .admindatefilter .controls {
-        display: block !important;
-        padding-bottom: 10px !important;
-    }
-
-    /* Efeitos de Hover (Passar o mouse) */
-    .admindatefilter .controls input[type="submit"]:hover {
-        background-color: #0056b3 !important;
-    }
-
-    .admindatefilter .controls a:hover {
-        background-color: #117a8b !important;
-    }
+/* ── DARK MODE ───────────────────────────────────────────────────────────── */
+body.dark-mode,
+body.dark-mode .wrapper                { background:#1a1a2e !important; color:#e0e0e0 !important; }
+body.dark-mode .content-wrapper        { background:#16213e !important; color:#e0e0e0 !important; }
+body.dark-mode .main-header.navbar     { background:#0f3460 !important; border-bottom-color:#0a2744 !important; }
+body.dark-mode .main-sidebar,
+body.dark-mode .main-sidebar .sidebar  { background:#0d1b2a !important; }
+body.dark-mode .nav-sidebar .nav-link  { color:#b0c4de !important; }
+body.dark-mode .nav-sidebar .nav-link:hover,
+body.dark-mode .nav-sidebar .nav-link.active { background:#1a3a5c !important; color:#fff !important; }
+body.dark-mode .card,
+body.dark-mode .card-body              { background:#1e2a3a !important; border-color:#2d3f52 !important; color:#e0e0e0 !important; }
+body.dark-mode .card-header            { background:#162030 !important; border-color:#2d3f52 !important; color:#c9d6e3 !important; }
+body.dark-mode #result_list,
+body.dark-mode .table                  { color:#d0dce8 !important; }
+body.dark-mode #result_list thead th,
+body.dark-mode .table thead th         { background:#162030 !important; color:#90b4ce !important; border-color:#2d3f52 !important; }
+body.dark-mode #result_list tbody tr   { background:#1e2a3a !important; }
+body.dark-mode #result_list tbody tr:nth-child(even) { background:#1a2535 !important; }
+body.dark-mode #result_list tbody tr:hover           { background:#253549 !important; }
+body.dark-mode #result_list td,
+body.dark-mode #result_list th         { border-color:#2d3f52 !important; }
+body.dark-mode input[type="text"],
+body.dark-mode input[type="date"],
+body.dark-mode input[type="number"],
+body.dark-mode select,
+body.dark-mode textarea                { background:#162030 !important; border-color:#2d4a65 !important; color:#d0dce8 !important; }
+body.dark-mode .cfb-wrap               { background:#1e2a3a !important; border-color:#2d3f52 !important; }
+body.dark-mode .cfb-field label        { color:#90b4ce !important; }
+body.dark-mode .cfb-field input,
+body.dark-mode .cfb-field select       { background:#162030 !important; border-color:#2d4a65 !important; color:#d0dce8 !important; }
+body.dark-mode h1,body.dark-mode h2,
+body.dark-mode h3,body.dark-mode h4,
+body.dark-mode h5,body.dark-mode h6    { color:#d0dce8 !important; }
+body.dark-mode a                       { color:#7ab3d3 !important; }
+body.dark-mode a:hover                 { color:#a8d4f0 !important; }
+body.dark-mode .dropdown-menu          { background:#1e2a3a !important; border-color:#2d3f52 !important; }
+body.dark-mode .dropdown-item          { color:#d0dce8 !important; }
+body.dark-mode .dropdown-item:hover    { background:#253549 !important; }
+body.dark-mode .breadcrumb             { background:#162030 !important; }
+body.dark-mode .breadcrumb-item a      { color:#7ab3d3 !important; }
+body.dark-mode .pagination .page-link  { background:#1e2a3a !important; border-color:#2d3f52 !important; color:#7ab3d3 !important; }
+body.dark-mode .select2-container--default .select2-selection--single { background:#162030 !important; border-color:#2d4a65 !important; }
+body.dark-mode .select2-container--default .select2-selection--single .select2-selection__rendered { color:#d0dce8 !important; }
+body.dark-mode .select2-dropdown       { background:#1e2a3a !important; border-color:#2d4a65 !important; }
+body.dark-mode .select2-container--default .select2-results__option { color:#d0dce8 !important; }
+body.dark-mode .select2-container--default .select2-results__option--highlighted { background:#253549 !important; }
+body.dark-mode .dashboard-cards .card-box { background:#1e2a3a !important; }
 </style>
+
+{# Aplica tema salvo antes do render — evita flash #}
+<script>
+(function(){
+    if(localStorage.getItem('malupe_theme')==='dark'){
+        document.documentElement.style.background='#1a1a2e';
+    }
+})();
+</script>
+{% endblock %}
+
+{% block extrajs %}
+{{ block.super }}
+{# CSS aqui vem DEPOIS de admin_fixes.css, garantindo override dos !important #}
+<style>
+body.dark-mode #result_list tbody tr,
+body.dark-mode #result_list tbody tr td,
+body.dark-mode .import-preview table tbody tr,
+body.dark-mode .import-preview table tbody tr td {
+    background-color: #1e2a3a !important;
+    color: #d0dce8 !important;
+}
+body.dark-mode #result_list tbody tr:nth-child(even),
+body.dark-mode #result_list tbody tr:nth-child(even) td {
+    background-color: #1a2535 !important;
+}
+body.dark-mode #result_list tbody tr:hover,
+body.dark-mode #result_list tbody tr:hover td {
+    background-color: #253549 !important;
+}
+body.dark-mode #result_list thead tr,
+body.dark-mode #result_list thead th {
+    background-color: #162030 !important;
+    color: #90b4ce !important;
+}
+body.dark-mode #result_list td,
+body.dark-mode #result_list th {
+    border-color: #2d3f52 !important;
+}
+/* Campos readonly e spans de formulário */
+body.dark-mode .readonly,
+body.dark-mode .help,
+body.dark-mode .form-row,
+body.dark-mode fieldset.module,
+body.dark-mode .module {
+    background-color: transparent !important;
+    color: #d0dce8 !important;
+}
+body.dark-mode .form-row .field-box,
+body.dark-mode .form-row p,
+body.dark-mode .form-row div {
+    background-color: transparent !important;
+    color: #d0dce8 !important;
+}
+
+/* ── Painel Financeiro (Dashboard) ──────────────────────────────────────── */
+body.dark-mode .card-dashboard {
+    background: #1e2a3a !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,.4) !important;
+}
+body.dark-mode .card-dashboard .big-number,
+body.dark-mode .card-dashboard .text-gray-800 { color: #d0dce8 !important; }
+body.dark-mode .card-dashboard .text-xs       { color: #90b4ce !important; }
+body.dark-mode .card-dashboard .card-body-custom { color: #d0dce8 !important; }
+body.dark-mode .card-dashboard .text-danger   { color: #ff6b6b !important; }
+body.dark-mode .card-dashboard .text-success  { color: #51cf66 !important; }
+body.dark-mode .card-dashboard .text-warning  { color: #fcc419 !important; }
+body.dark-mode .filter-card {
+    background: #1e2a3a !important;
+    border-color: #2d3f52 !important;
+    color: #d0dce8 !important;
+}
+body.dark-mode .filter-card label,
+body.dark-mode .filter-card .text-gray-700 { color: #b0c4de !important; }
+body.dark-mode h5.text-secondary,
+body.dark-mode .text-secondary { color: #90b4ce !important; }
+body.dark-mode hr { border-color: #2d3f52 !important; }
+body.dark-mode .card-dashboard .border-right { border-color: #2d3f52 !important; }
+body.dark-mode .card-header-custom {
+    color: #fff !important;
+}
+</style>
+<script>
+(function(){
+    // Aplica tema
+    var dark = localStorage.getItem('malupe_theme') === 'dark';
+    if(dark) document.body.classList.add('dark-mode');
+
+    // Injeta botão na navbar
+    var navRight = document.querySelector('.navbar-nav.ml-auto');
+    if(navRight && !document.getElementById('theme-toggle-btn')){
+        var li  = document.createElement('li');
+        li.className = 'nav-item';
+        var btn = document.createElement('button');
+        btn.id   = 'theme-toggle-btn';
+        btn.type = 'button';
+        btn.innerHTML = dark ? '&#9728; Claro' : '&#127769; Escuro';
+        btn.onclick = function(){
+            var d = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('malupe_theme', d ? 'dark' : 'light');
+            btn.innerHTML = d ? '&#9728; Claro' : '&#127769; Escuro';
+        };
+        li.appendChild(btn);
+        navRight.insertBefore(li, navRight.firstChild);
+    }
+})();
+</script>
 {% endblock %}

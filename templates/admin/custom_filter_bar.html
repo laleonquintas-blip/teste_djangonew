@@ -1,0 +1,115 @@
+{% comment %}
+  Include compartilhado: estilos + JS da barra de filtros customizada.
+  Inclua com: {% include "admin/custom_filter_bar.html" %}
+{% endcomment %}
+<style>
+/* Oculta filtros nativos do Jazzmin/Django */
+#change-list-filters,
+#changelist-filter,
+#changelist-search { display: none !important; }
+
+/* Barra de filtros customizada */
+.cfb-wrap {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 14px 18px 10px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.cfb-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #6c757d;
+    letter-spacing: .04em;
+    margin-bottom: 10px;
+}
+.cfb-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+}
+.cfb-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 140px;
+}
+.cfb-field label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #495057;
+    white-space: nowrap;
+}
+.cfb-field input[type="text"],
+.cfb-field input[type="date"],
+.cfb-field select {
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    font-size: 13px;
+    background: #fff;
+    color: #212529;
+    outline: none;
+    transition: border-color .15s;
+    min-width: 0;
+}
+.cfb-field input:focus,
+.cfb-field select:focus { border-color: #007bff; }
+.cfb-field.cfb-date-range {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 4px;
+}
+.cfb-field.cfb-date-range .cfb-sub { display: flex; flex-direction: column; gap: 3px; }
+.cfb-field.cfb-date-range .cfb-sep { font-size: 13px; color: #888; padding-bottom: 6px; }
+.cfb-actions { display: flex; gap: 8px; align-items: flex-end; margin-top: 4px; }
+.cfb-btn {
+    height: 32px;
+    padding: 0 18px;
+    border: none;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    transition: background .15s;
+}
+.cfb-btn-search { background: #007bff; color: #fff; }
+.cfb-btn-search:hover { background: #0056b3; }
+.cfb-btn-clear  { background: #e9ecef; color: #495057; }
+.cfb-btn-clear:hover  { background: #ced4da; }
+@media (max-width: 768px) {
+    .cfb-row { flex-direction: column; }
+    .cfb-field { min-width: 100%; }
+}
+</style>
+<script>
+function cfbApply(params) {
+    const url = new URL(window.location.pathname, window.location.origin);
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== null && v !== undefined && String(v).trim() !== '') {
+            url.searchParams.set(k, String(v).trim());
+        }
+    });
+    window.location.href = url.toString();
+}
+function cfbClear() {
+    window.location.href = window.location.pathname;
+}
+function cfbVal(id) {
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const p = new URLSearchParams(window.location.search);
+    document.querySelectorAll('[data-cfb-param]').forEach(el => {
+        const val = p.get(el.dataset.cfbParam);
+        if (val) el.value = val;
+    });
+});
+</script>

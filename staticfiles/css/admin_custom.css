@@ -1,12 +1,8 @@
-/* static/css/admin_custom.css - VERSÃO FINAL AJUSTADA */
+/* static/css/admin_custom.css */
 
 /* ============================================================
    1. GHOST BUSTER (MATAR O CAMPO FANTASMA)
    ============================================================ */
-/* Esconde o input de busca duplicado na lateral.
-   Adicionamos height:0 e border:none para garantir que nem a
-   borda branca apareça.
-*/
 #changelist-filter input[name="q"] {
     display: none !important;
     visibility: hidden !important;
@@ -21,70 +17,219 @@
 /* ============================================================
    2. REMOVER O BOTÃO 'PESQUISAR' DUPLICADO (RODAPÉ)
    ============================================================ */
-/* O segredo: Usamos o seletor ">" para pegar apenas o botão que está
-   solto na div do formulário, SEM atingir o botão que está dentro
-   do controle de data (.admindatefilter).
-*/
 #changelist-filter form > div > input[type="submit"] {
     display: none !important;
 }
 
 /* ============================================================
-   3. ESTILIZAÇÃO DOS BOTÕES DO FILTRO DE DATA (TOPO)
+   3. ESTILIZAÇÃO DOS BOTÕES DO FILTRO DE DATA
    ============================================================ */
-/* Garante o layout lado a lado */
 .admindatefilter .controls {
     display: flex !important;
     flex-direction: row !important;
-    justify-content: space-between !important;
     gap: 5px !important;
     margin-bottom: 15px !important;
     padding-top: 5px !important;
 }
 
-/* Botão PESQUISAR (Do plugin de data) -> AZUL */
 .admindatefilter .controls input[type="submit"],
-.admindatefilter .controls button {
-    display: block !important;
-    visibility: visible !important; /* Força visibilidade caso algo tenha escondido */
-    flex: 1 !important;
-    background-color: #007bff !important; /* Azul */
-    color: white !important;
-    border: none !important;
+.admindatefilter .controls input[type="reset"] {
+    flex: 1 1 0 !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
     padding: 8px 0 !important;
+    border: none !important;
     border-radius: 4px !important;
     font-weight: bold !important;
     font-size: 11px !important;
     cursor: pointer !important;
     text-transform: uppercase !important;
-    height: auto !important;
-    margin: 0 !important;
-    line-height: normal !important;
-}
-
-/* Botão LIMPAR (Do plugin de data) -> AZUL TURQUESA */
-.admindatefilter .controls a {
-    display: block !important;
-    visibility: visible !important;
-    flex: 1 !important;
-    background-color: #17a2b8 !important; /* Azul Turquesa */
     color: white !important;
-    text-align: center !important;
-    padding: 8px 0 !important;
-    border-radius: 4px !important;
-    font-weight: bold !important;
-    font-size: 11px !important;
-    text-decoration: none !important;
-    text-transform: uppercase !important;
     margin: 0 !important;
     line-height: normal !important;
 }
 
-/* Efeitos Hover */
+.admindatefilter .controls input[type="submit"] {
+    background-color: #007bff !important;
+}
+
+.admindatefilter .controls input[type="reset"] {
+    background-color: #6c757d !important;
+}
+
 .admindatefilter .controls input[type="submit"]:hover { background-color: #0056b3 !important; }
-.admindatefilter .controls a:hover { background-color: #117a8b !important; }
+.admindatefilter .controls input[type="reset"]:hover  { background-color: #545b62 !important; }
 
 /* ============================================================
-   4. TELA DE LOGIN (MANTIDO)
+   4. TELA DE LOGIN
    ============================================================ */
 .login-page .login-logo { max-width: 350px !important; margin: 0 auto 15px auto !important; }
+
+/* ============================================================
+   5. ESCONDER ELEMENTOS FANTASMA DO JAZZMIN
+   ============================================================ */
+#search_group {
+    display: none !important;
+}
+
+#searchbar,
+#searchbar + .form-group,
+.form-group:has(#searchbar) {
+    display: none !important;
+}
+
+/* ============================================================
+   6. OCULTAR BOTÃO CUSTOMIZAR (control-sidebar)
+   ============================================================ */
+.nav-item:has([data-widget="control-sidebar"]),
+li:has([data-widget="control-sidebar"]) {
+    display: none !important;
+}
+
+/* ============================================================
+   7. BOTÃO DARK/LIGHT MODE
+   ============================================================ */
+#theme-toggle-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    color: inherit;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 12px;
+    margin: 6px 8px 0 0;
+    transition: all .2s;
+    line-height: 1.5;
+}
+#theme-toggle-btn:hover {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.6);
+}
+
+/* ============================================================
+   8. DARK MODE
+   ============================================================ */
+body.dark-mode,
+body.dark-mode .wrapper {
+    background-color: #1a1a2e !important;
+    color: #e0e0e0 !important;
+}
+body.dark-mode .content-wrapper {
+    background-color: #16213e !important;
+    color: #e0e0e0 !important;
+}
+body.dark-mode .main-header.navbar {
+    background-color: #0f3460 !important;
+    border-bottom-color: #0a2744 !important;
+}
+body.dark-mode .main-sidebar,
+body.dark-mode .main-sidebar .sidebar {
+    background-color: #0d1b2a !important;
+}
+body.dark-mode .nav-sidebar .nav-link {
+    color: #b0c4de !important;
+}
+body.dark-mode .nav-sidebar .nav-link:hover,
+body.dark-mode .nav-sidebar .nav-link.active {
+    background-color: #1a3a5c !important;
+    color: #fff !important;
+}
+body.dark-mode .card,
+body.dark-mode .card-body {
+    background-color: #1e2a3a !important;
+    border-color: #2d3f52 !important;
+    color: #e0e0e0 !important;
+}
+body.dark-mode .card-header {
+    background-color: #162030 !important;
+    border-color: #2d3f52 !important;
+    color: #c9d6e3 !important;
+}
+body.dark-mode #result_list,
+body.dark-mode .table {
+    color: #d0dce8 !important;
+}
+body.dark-mode #result_list thead th,
+body.dark-mode .table thead th {
+    background-color: #162030 !important;
+    color: #90b4ce !important;
+    border-color: #2d3f52 !important;
+}
+body.dark-mode #result_list tbody tr {
+    background-color: #1e2a3a !important;
+    border-color: #2d3f52 !important;
+}
+body.dark-mode #result_list tbody tr:nth-child(even) {
+    background-color: #1a2535 !important;
+}
+body.dark-mode #result_list tbody tr:hover {
+    background-color: #253549 !important;
+}
+body.dark-mode #result_list td, body.dark-mode #result_list th {
+    border-color: #2d3f52 !important;
+}
+body.dark-mode input[type="text"],
+body.dark-mode input[type="date"],
+body.dark-mode input[type="number"],
+body.dark-mode select,
+body.dark-mode textarea {
+    background-color: #162030 !important;
+    border-color: #2d4a65 !important;
+    color: #d0dce8 !important;
+}
+body.dark-mode .cfb-wrap {
+    background-color: #1e2a3a !important;
+    border-color: #2d3f52 !important;
+    color: #c9d6e3 !important;
+}
+body.dark-mode .cfb-field label { color: #90b4ce !important; }
+body.dark-mode .cfb-field input,
+body.dark-mode .cfb-field select {
+    background-color: #162030 !important;
+    border-color: #2d4a65 !important;
+    color: #d0dce8 !important;
+}
+body.dark-mode .breadcrumb { background-color: #162030 !important; }
+body.dark-mode .breadcrumb-item a { color: #7ab3d3 !important; }
+body.dark-mode h1, body.dark-mode h2, body.dark-mode h3,
+body.dark-mode h4, body.dark-mode h5, body.dark-mode h6 {
+    color: #d0dce8 !important;
+}
+body.dark-mode a { color: #7ab3d3 !important; }
+body.dark-mode a:hover { color: #a8d4f0 !important; }
+body.dark-mode .btn-primary { background-color: #1565c0 !important; border-color: #1565c0 !important; }
+body.dark-mode .navbar-white { background-color: #0f3460 !important; }
+body.dark-mode .dashboard-cards .card-box {
+    background-color: #1e2a3a !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,.3) !important;
+}
+body.dark-mode .dropdown-menu {
+    background-color: #1e2a3a !important;
+    border-color: #2d3f52 !important;
+}
+body.dark-mode .dropdown-item { color: #d0dce8 !important; }
+body.dark-mode .dropdown-item:hover { background-color: #253549 !important; }
+body.dark-mode .pagination .page-link {
+    background-color: #1e2a3a !important;
+    border-color: #2d3f52 !important;
+    color: #7ab3d3 !important;
+}
+body.dark-mode .select2-container--default .select2-selection--single {
+    background-color: #162030 !important;
+    border-color: #2d4a65 !important;
+    color: #d0dce8 !important;
+}
+body.dark-mode .select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: #d0dce8 !important;
+}
+body.dark-mode .select2-dropdown {
+    background-color: #1e2a3a !important;
+    border-color: #2d4a65 !important;
+}
+body.dark-mode .select2-container--default .select2-results__option {
+    color: #d0dce8 !important;
+}
+body.dark-mode .select2-container--default .select2-results__option--highlighted {
+    background-color: #253549 !important;
+}

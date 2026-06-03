@@ -1,0 +1,17 @@
+{% extends "admin/import_export/change_list.html" %}
+
+{% block result_list %}
+{% if custom_filter_template %}
+    {% include "admin/custom_filter_bar.html" %}
+    {% include custom_filter_template %}
+{% endif %}
+{{ block.super }}
+{% endblock %}
+
+{% block object-tools-items %}
+<div class="btn-group float-right">
+    {% include "admin/import_export/change_list_import_item.html" %}
+    {% include "admin/import_export/change_list_export_item.html" %}
+    {{ block.super }}
+</div>
+{% endblock %}

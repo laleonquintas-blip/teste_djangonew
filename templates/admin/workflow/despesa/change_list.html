@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block content_title %}
-    <h1> Fluxo de Aprovação de Despesas </h1>
+    <h1>Fluxo de Aprovação de Despesas</h1>
 {% endblock %}
 
 {# --- BOTÕES DE AÇÃO --- #}
@@ -23,6 +23,69 @@
 {% endblock %}
 
 {% block result_list %}
+
+{% include "admin/custom_filter_bar.html" %}
+
+{# --- BARRA DE FILTROS CUSTOMIZADA --- #}
+<div class="cfb-wrap">
+    <div class="cfb-title">Filtros</div>
+    <div class="cfb-row">
+
+        <div class="cfb-field" style="min-width:80px;max-width:100px;">
+            <label>ID</label>
+            <input type="text" id="cfb_id" data-cfb-param="id_q" placeholder="Ex: 42">
+        </div>
+
+        <div class="cfb-field" style="flex:1;min-width:160px;">
+            <label>Solicitante</label>
+            <select id="cfb_sol" data-cfb-param="sol_q">
+                <option value="">— Todos —</option>
+                {% for uid, ufirst, ulast in solicitantes_opts %}
+                <option value="{{ ufirst }} {{ ulast }}">{{ ufirst }} {{ ulast }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="cfb-field" style="flex:2;min-width:200px;">
+            <label>Despesa (Fornecedor)</label>
+            <input type="text" id="cfb_desp" data-cfb-param="desp_q" placeholder="Buscar fornecedor...">
+        </div>
+
+        <div class="cfb-field cfb-date-range" style="flex:2;min-width:260px;">
+            <div class="cfb-sub">
+                <label>Data Solicitação De</label>
+                <input type="date" id="cfb_data_ini" data-cfb-param="data_criacao__range__gte">
+            </div>
+            <span class="cfb-sep">até</span>
+            <div class="cfb-sub">
+                <label>&nbsp;</label>
+                <input type="date" id="cfb_data_fim" data-cfb-param="data_criacao__range__lte">
+            </div>
+        </div>
+
+        <div class="cfb-field" style="min-width:160px;">
+            <label>Status</label>
+            <select id="cfb_status" data-cfb-param="status">
+                <option value="">— Todos —</option>
+                {% for val, label in status_choices %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+    </div>
+    <div class="cfb-actions" style="margin-top:10px;">
+        <button type="button" class="cfb-btn cfb-btn-search" onclick="cfbApply({
+            id_q:    cfbVal('cfb_id'),
+            sol_q:   cfbVal('cfb_sol'),
+            desp_q:  cfbVal('cfb_desp'),
+            'data_criacao__range__gte': cfbVal('cfb_data_ini'),
+            'data_criacao__range__lte': cfbVal('cfb_data_fim'),
+            status:  cfbVal('cfb_status')
+        })">🔍 Pesquisar</button>
+        <button type="button" class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
+    </div>
+</div>
 
 {# --- ESTILO DOS CARDS --- #}
 <style>
@@ -46,8 +109,8 @@
                 {{ card.status_label }}
             </div>
             <div class="card-content">
-                <div class="card-value">
-                    <small style="color:#aaa; font-weight:normal;">R$</small>
+                <div class="card-value" style="color: {{ card.color }};">
+                    <small style="opacity:.65; font-weight:normal;">R$</small>
                     {{ card.total_valor|default:0|intcomma }}
                 </div>
                 <div class="card-qtd-box">

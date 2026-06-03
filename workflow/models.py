@@ -5,6 +5,7 @@ from core.models import UsuarioCustomizado
 from cadastros.models import Fornecedor, Empresa, Banco, Tomador, Filial, MotivoAusencia, Colaborador
 
 STATUS_WORKFLOW = [
+    ('AGUARDANDO_COMERCIAL', 'Aguardando Comercial'),
     ('AGUARDANDO_ADM', 'Aguardando Administrativo'),
     ('AGUARDANDO_RH', 'Aguardando RH'),
     ('AGUARDANDO_FIN', 'Aguardando Financeiro'),
@@ -66,6 +67,8 @@ class Despesa(models.Model):
     operador = models.ForeignKey(UsuarioCustomizado, on_delete=models.SET_NULL, null=True, blank=True,
                                  related_name='tarefas_operador', verbose_name="Selecione o Operador")
     motivo_cancelamento = models.TextField(blank=True, verbose_name="Motivo do Cancelamento")
+    justificativa_retorno = models.TextField(blank=True, verbose_name="Justificativa / Questionamento")
+    data_criacao = models.DateTimeField(auto_now_add=True, verbose_name="Data/Hora da Solicitação", null=True)
     data_ultima_alteracao = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):

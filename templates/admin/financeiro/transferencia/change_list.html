@@ -1,0 +1,78 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content_title %}<h1>Transferências</h1>{% endblock %}
+
+{% block result_list %}
+{% include "admin/custom_filter_bar.html" %}
+
+<div class="cfb-wrap">
+    <div class="cfb-title">Filtros</div>
+    <div class="cfb-row">
+
+        <div class="cfb-field" style="min-width:180px;">
+            <label>Classificação</label>
+            <select id="cfb_status" data-cfb-param="status__exact">
+                <option value="">— Todas —</option>
+                <option value="DEFINITIVA">🟢 Definitiva</option>
+                <option value="TEMP_PENDENTE">🟡 Temporária (Pendente)</option>
+                <option value="TEMP_DEVOLVIDA">🔵 Temporária (Devolvida)</option>
+                <option value="CANCELADA">⚫ Cancelada</option>
+            </select>
+        </div>
+
+        <div class="cfb-field" style="min-width:160px;">
+            <label>Banco de Origem (Saiu)</label>
+            <select id="cfb_origem" data-cfb-param="banco_origem__id__exact">
+                <option value="">— Todos —</option>
+                {% for bid, bnome in bancos_opts %}
+                <option value="{{ bid }}">{{ bnome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="cfb-field" style="min-width:160px;">
+            <label>Banco de Destino (Entrou)</label>
+            <select id="cfb_destino" data-cfb-param="banco_destino__id__exact">
+                <option value="">— Todos —</option>
+                {% for bid, bnome in bancos_opts %}
+                <option value="{{ bid }}">{{ bnome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="cfb-field" style="min-width:150px;">
+            <label>Alerta de Retorno</label>
+            <select id="cfb_alerta" data-cfb-param="status__exact">
+                <option value="">— Todos —</option>
+                <option value="TEMP_PENDENTE">🟡 Pendente de Devolução</option>
+                <option value="TEMP_DEVOLVIDA">🔵 Já Devolvida</option>
+            </select>
+        </div>
+
+        <div class="cfb-field" style="min-width:140px;">
+            <label>Feito Por</label>
+            <select id="cfb_feito" data-cfb-param="feito_q">
+                <option value="">— Todos —</option>
+                {% for uid, uname in usuarios_opts %}
+                <option value="{{ uname }}">{{ uname }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+    </div>
+    <div class="cfb-actions" style="margin-top:10px;">
+        <button type="button" class="cfb-btn cfb-btn-search" onclick="
+            var st = cfbVal('cfb_status') || cfbVal('cfb_alerta');
+            cfbApply({
+                'status__exact':              st,
+                'banco_origem__id__exact':    cfbVal('cfb_origem'),
+                'banco_destino__id__exact':   cfbVal('cfb_destino'),
+                feito_q:                      cfbVal('cfb_feito')
+            })">🔍 Pesquisar</button>
+        <button type="button" class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
+    </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

@@ -15,6 +15,81 @@ from .models import ContasAPagar, ContasAReceber, BaseSaldo, GerarFixo, Transfer
 from cadastros.models import Cliente
 
 
+# ---------------------------------------------------------------------------
+# Filtros de texto ocultos (sem lookups — processados pelo backend,
+# mas não renderizados pela sidebar do Django/Jazzmin)
+# ---------------------------------------------------------------------------
+class _TextFilter(admin.SimpleListFilter):
+    """Base: recebe valor via URL, filtra o queryset, não exibe choices na sidebar."""
+    def lookups(self, request, model_admin):
+        return ()
+
+    def choices(self, changelist):
+        return []
+
+    def has_output(self):
+        # Deve retornar True para que Django inclua o filtro no pipeline
+        # e chame queryset() quando o parâmetro estiver na URL.
+        return True
+
+    def queryset(self, request, queryset):
+        return queryset  # sobrescrito nas subclasses
+
+
+class NotaSearchFilter(_TextFilter):
+    title = 'Nota'
+    parameter_name = 'nota_q'
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(nota__icontains=self.value())
+
+
+class FornecedorSearchFilter(_TextFilter):
+    title = 'Fornecedor'
+    parameter_name = 'forn_q'
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(fornecedor__razao_social__icontains=self.value())
+
+
+class ClienteSearchFilter(_TextFilter):
+    title = 'Cliente'
+    parameter_name = 'cli_q'
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(cliente__razao_social__icontains=self.value())
+
+
+class NomeSearchFilter(_TextFilter):
+    title = 'Nome'
+    parameter_name = 'nome_q'
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(nome__icontains=self.value())
+
+
+class UsuarioBaixaFilter(_TextFilter):
+    title = 'Usuário da Baixa'
+    parameter_name = 'usuario_q'
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(usuario_baixa__icontains=self.value())
+
+
+class FeitoporSearchFilter(_TextFilter):
+    title = 'Feito Por'
+    parameter_name = 'feito_q'
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(criado_por__username__icontains=self.value())
+
+
 # --- TELA CUSTOMIZADA: GERAR FIXOS MENSAIS NO MENU ---
 @admin.register(GerarFixo)
 class GerarFixoAdmin(admin.ModelAdmin):
@@ -239,15 +314,29 @@ def gerar_fixos_mensais(modeladmin, request, queryset):
 # --- 1. CONTAS A PAGAR ---
 class ContasAPagarAdmin(ImportExportModelAdmin):
     list_display = ('nota', 'fornecedor', 'vencimento', 'valor', 'status_visual', 'data_baixa', 'usuario_baixa')
+    search_fields = ('fornecedor__razao_social', 'nota', 'observacoes')
     list_filter = (
         StatusFilter,
         ('vencimento', DateRangeFilter),
+        ('data_baixa', DateRangeFilter),
         EmpresaPagadoraFilter,
+        NotaSearchFilter,
+        FornecedorSearchFilter,
     )
     date_hierarchy = 'vencimento'
     readonly_fields = ('data_baixa', 'usuario_baixa')
     exclude = ('nota',)
     actions = [marcar_como_pago, marcar_como_cancelado, marcar_como_pendente, gerar_fixos_mensais]
+
+    def changelist_view(self, request, extra_context=None):
+        extra = extra_context or {}
+        extra['custom_filter_template'] = 'admin/financeiro/contasapagar/_filters.html'
+        extra['empresas_opts'] = list(
+            ContasAPagar.objects.select_related('empresa_pagadora')
+            .values_list('empresa_pagadora__id', 'empresa_pagadora__nome')
+            .distinct().order_by('empresa_pagadora__nome')
+        )
+        return super().changelist_view(request, extra_context=extra)
 
     def save_model(self, request, obj, form, change):
         if obj.status == 'PAGO' and not obj.usuario_baixa:
@@ -258,16 +347,29 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
 # --- 2. CONTAS A RECEBER ---
 class ContasAReceberAdmin(ImportExportModelAdmin):
     list_display = ('nota', 'cliente', 'vencimento', 'valor', 'status_visual', 'data_baixa', 'usuario_baixa')
-    search_fields = ('nota', 'cliente__razao_social')
+    search_fields = ('cliente__razao_social', 'nota', 'observacoes')
     list_filter = (
         StatusFilter,
         ('vencimento', DateRangeFilter),
+        ('data_baixa', DateRangeFilter),
         EmpresaPrestadoraFilter,
+        NotaSearchFilter,
+        ClienteSearchFilter,
     )
     date_hierarchy = 'vencimento'
     readonly_fields = ('data_baixa', 'usuario_baixa')
     exclude = ('nota',)
     actions = [marcar_como_pago, marcar_como_cancelado, marcar_como_pendente]
+
+    def changelist_view(self, request, extra_context=None):
+        extra = extra_context or {}
+        extra['custom_filter_template'] = 'admin/financeiro/contasareceber/_filters.html'
+        extra['empresas_opts'] = list(
+            ContasAReceber.objects.select_related('empresa_prestadora')
+            .values_list('empresa_prestadora__id', 'empresa_prestadora__nome')
+            .distinct().order_by('empresa_prestadora__nome')
+        )
+        return super().changelist_view(request, extra_context=extra)
 
     def save_model(self, request, obj, form, change):
         if obj.status == 'PAGO' and not obj.usuario_baixa:
@@ -281,12 +383,25 @@ class BaseSaldoAdmin(ImportExportModelAdmin):
     search_fields = ('nome', 'empresa', 'banco')
     list_filter = (
         ('data_baixa', DateRangeFilter),
-        StatusSaldoFilter,
         OrigemSaldoFilter,
         EmpresaSaldoFilter,
         BancoSaldoFilter,
+        NomeSearchFilter,
+        UsuarioBaixaFilter,
     )
     date_hierarchy = 'data_baixa'
+
+    def changelist_view(self, request, extra_context=None):
+        extra = extra_context or {}
+        extra['custom_filter_template'] = 'admin/financeiro/basesaldo/_filters.html'
+        extra['empresas_opts'] = list(BaseSaldo.objects.values_list('empresa', flat=True).distinct().order_by('empresa'))
+        extra['bancos_opts']   = list(BaseSaldo.objects.values_list('banco',   flat=True).distinct().order_by('banco'))
+        extra['origens_opts']  = list(BaseSaldo.objects.values_list('origem',  flat=True).distinct().order_by('origem'))
+        extra['usuarios_opts'] = list(
+            BaseSaldo.objects.exclude(usuario_baixa__isnull=True).exclude(usuario_baixa='')
+            .values_list('usuario_baixa', flat=True).distinct().order_by('usuario_baixa')
+        )
+        return super().changelist_view(request, extra_context=extra)
 
     def has_add_permission(self, request): return False
     def has_change_permission(self, request, obj=None): return False
@@ -295,12 +410,13 @@ class BaseSaldoAdmin(ImportExportModelAdmin):
 
 # --- 4. TRANSFERÊNCIAS ---
 class TransferenciaAdmin(admin.ModelAdmin):
+    change_list_template = "admin/financeiro/transferencia/change_list.html"
     list_display = (
         'data', 'empresa', 'valor',
         'banco_origem', 'seta_visual', 'banco_destino',
         'status_badge', 'alerta_retorno', 'usuario_visual'
     )
-    list_filter = ('status', 'banco_origem', 'banco_destino')
+    list_filter = ('status', 'banco_origem', 'banco_destino', FeitoporSearchFilter)
     search_fields = ('observacao', 'instrucao_retorno')
     readonly_fields = ('criado_por', 'data_devolucao')
 
@@ -398,6 +514,17 @@ class TransferenciaAdmin(admin.ModelAdmin):
 
         return "-"
     alerta_retorno.short_description = "Alerta de Retorno"
+
+    def changelist_view(self, request, extra_context=None):
+        from cadastros.models import Banco
+        extra = extra_context or {}
+        extra['bancos_opts'] = list(Banco.objects.values_list('id', 'nome').order_by('nome'))
+        extra['usuarios_opts'] = list(
+            Transferencia.objects.exclude(criado_por=None)
+            .values_list('criado_por__id', 'criado_por__username')
+            .distinct().order_by('criado_por__username')
+        )
+        return super().changelist_view(request, extra_context=extra)
 
     def save_model(self, request, obj, form, change):
         if not obj.pk:

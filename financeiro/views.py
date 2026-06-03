@@ -69,10 +69,8 @@ def dashboard_financeiro(request):
 
         dados_bancos.append({
             'nome': banco.nome,
-            'entradas': total_entradas,
-            'saidas': total_saidas,
-            'transferencias_entrada': transferencias_entrada,
-            'transferencias_saida': transferencias_saida,
+            'entradas': total_entradas + transferencias_entrada,
+            'saidas': total_saidas + transferencias_saida,
             'saldo': saldo
         })
 

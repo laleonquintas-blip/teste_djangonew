@@ -1,0 +1,55 @@
+{% load i18n rangefilter_compat %}
+<h3>{{ title }}</h3>
+<style nonce="{{ spec.request.csp_nonce }}">
+    .admindatefilter { padding: 0 15px 12px; border-bottom: 1px solid var(--border-color); }
+    .admindatefilter label { display: block; font-size: 12px; color: #666; margin: 6px 0 2px; }
+    .admindatefilter input[type="date"] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 5px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 13px;
+        background: #fff;
+    }
+    .admindatefilter .controls { display: flex; gap: 6px; margin-top: 10px; }
+    .admindatefilter .controls button {
+        flex: 1; padding: 6px 0; border: none; border-radius: 4px;
+        font-weight: bold; font-size: 11px; cursor: pointer;
+        text-transform: uppercase; color: white;
+    }
+    .admindatefilter .controls .btn-search { background: #007bff; }
+    .admindatefilter .controls .btn-reset  { background: #6c757d; }
+    .admindatefilter .controls .btn-search:hover { background: #0056b3; }
+    .admindatefilter .controls .btn-reset:hover  { background: #545b62; }
+</style>
+
+{% block quick-select-choices %}{% endblock %}
+<div class="admindatefilter">
+    <form method="GET" action="." id="{{ choices.0.system_name }}-form">
+        {% for field in spec.form %}
+            <label for="id_{{ field.html_name }}">{{ field.label }}</label>
+            <input type="date" id="id_{{ field.html_name }}"
+                   name="{{ field.html_name }}"
+                   value="{{ field.value|default:'' }}"
+                   placeholder="dd/mm/aaaa">
+        {% endfor %}
+        {% for choice in choices %}
+            <input type="hidden" id="{{ choice.system_name }}-query-string" value="{{ choice.query_string }}">
+        {% endfor %}
+        <div class="controls">
+            <button type="button" class="btn-search"
+                onclick="(function(){
+                    var qs = document.getElementById('{{ choices.0.system_name }}-query-string').value;
+                    var form = document.getElementById('{{ choices.0.system_name }}-form');
+                    var data = new URLSearchParams(new FormData(form)).toString();
+                    window.location = window.location.pathname + qs + (qs==='?'?'':'&') + data;
+                })()">{% trans "Search" %}</button>
+            <button type="button" class="btn-reset"
+                onclick="(function(){
+                    var qs = document.getElementById('{{ choices.0.system_name }}-query-string').value;
+                    window.location = window.location.pathname + qs;
+                })()">{% trans "Reset" %}</button>
+        </div>
+    </form>
+</div>

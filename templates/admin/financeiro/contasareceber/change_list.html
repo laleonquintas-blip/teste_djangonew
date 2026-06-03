@@ -1,0 +1,85 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content_title %}<h1>Contas a Receber</h1>{% endblock %}
+
+{% block result_list %}
+{% include "admin/custom_filter_bar.html" %}
+
+<div class="cfb-wrap">
+    <div class="cfb-title">Filtros</div>
+    <div class="cfb-row">
+
+        <div class="cfb-field" style="flex:1;min-width:160px;">
+            <label>Nº da Nota</label>
+            <input type="text" id="cfb_nota" data-cfb-param="nota_q" placeholder="Ex: CR-00012">
+        </div>
+
+        <div class="cfb-field" style="flex:2;min-width:200px;">
+            <label>Cliente</label>
+            <input type="text" id="cfb_cli" data-cfb-param="cli_q" placeholder="Nome do cliente...">
+        </div>
+
+        <div class="cfb-field cfb-date-range" style="flex:2;min-width:260px;">
+            <div class="cfb-sub">
+                <label>Vencimento De</label>
+                <input type="date" id="cfb_venc_ini" data-cfb-param="vencimento__range__gte">
+            </div>
+            <span class="cfb-sep">até</span>
+            <div class="cfb-sub">
+                <label>&nbsp;</label>
+                <input type="date" id="cfb_venc_fim" data-cfb-param="vencimento__range__lte">
+            </div>
+        </div>
+
+        <div class="cfb-field cfb-date-range" style="flex:2;min-width:260px;">
+            <div class="cfb-sub">
+                <label>Data Recebimento De</label>
+                <input type="date" id="cfb_baixa_ini" data-cfb-param="data_baixa__range__gte">
+            </div>
+            <span class="cfb-sep">até</span>
+            <div class="cfb-sub">
+                <label>&nbsp;</label>
+                <input type="date" id="cfb_baixa_fim" data-cfb-param="data_baixa__range__lte">
+            </div>
+        </div>
+
+        <div class="cfb-field" style="min-width:150px;">
+            <label>Situação</label>
+            <select id="cfb_status" data-cfb-param="status_real">
+                <option value="">— Todas —</option>
+                <option value="A_VENCER">🔵 A Vencer</option>
+                <option value="VENCIDO">🔴 Vencido</option>
+                <option value="PAGO">🟢 Recebido</option>
+                <option value="CANCELADO">⚫ Cancelado</option>
+            </select>
+        </div>
+
+        <div class="cfb-field" style="min-width:160px;">
+            <label>Empresa Prestadora</label>
+            <select id="cfb_empresa" data-cfb-param="empresa_prestadora">
+                <option value="">— Todas —</option>
+                {% for eid, enome in empresas_opts %}
+                <option value="{{ eid }}">{{ enome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+    </div>
+    <div class="cfb-actions" style="margin-top:10px;">
+        <button class="cfb-btn cfb-btn-search" onclick="cfbApply({
+            nota_q: cfbVal('cfb_nota'),
+            cli_q: cfbVal('cfb_cli'),
+            'vencimento__range__gte': cfbVal('cfb_venc_ini'),
+            'vencimento__range__lte': cfbVal('cfb_venc_fim'),
+            'data_baixa__range__gte': cfbVal('cfb_baixa_ini'),
+            'data_baixa__range__lte': cfbVal('cfb_baixa_fim'),
+            status_real: cfbVal('cfb_status'),
+            empresa_prestadora: cfbVal('cfb_empresa')
+        })">🔍 Pesquisar</button>
+        <button class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
+    </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

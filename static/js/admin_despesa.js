@@ -85,8 +85,14 @@
         });
 
         // Reage instantaneamente a mudanças no Status
+        // Cobre tanto o select nativo quanto o Select2 (usado pelo Jazzmin)
         $(document).on('change', '#id_status', function () {
             toggleMotivoCancelamento();
+        });
+        $(document).on('select2:select select2:unselect', function (e) {
+            if ($(e.target).attr('id') === 'id_status') {
+                toggleMotivoCancelamento();
+            }
         });
     });
 

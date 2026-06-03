@@ -100,6 +100,10 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 
 AUTH_USER_MODEL = 'core.UsuarioCustomizado'
 
+# Redireciona para o admin após o login (evita o 404 do /accounts/profile/)
+LOGIN_REDIRECT_URL = '/admin/'
+LOGOUT_REDIRECT_URL = '/admin/login/'
+
 # ==============================================================================
 # CONFIGURAÇÕES DO JAZZMIN
 # ==============================================================================
