@@ -8,7 +8,9 @@
         '.field-inicio_cobertura', '.field-fim_cobertura',
         '.field-tomador', '.field-filial',
         '.field-motivo_ausencia', '.field-colaborador_faltou',
-        '.field-nome_cobriu', '.field-forma_pagamento',
+    ];
+    const camposSolicitacao = [
+        '.field-nome_cobriu',
         '.field-dados_bancarios_pagto'
     ];
 
@@ -41,13 +43,20 @@
         }
 
         // Aplica as regras de visibilidade
-        if (selectedType === 'SOLICITACAO' || selectedType === 'EXTRA') {
+        if (selectedType === 'SOLICITACAO') {
             camposGerais.forEach(function(cls) { $(cls).show(); });
+            camposSolicitacao.forEach(function(cls) { $(cls).show(); });
+            camposCaixinha.forEach(function(cls) { $(cls).hide(); });
+        }
+        else if (selectedType === 'EXTRA') {
+            camposGerais.forEach(function(cls) { $(cls).show(); });
+            camposSolicitacao.forEach(function(cls) { $(cls).hide(); });
             camposCaixinha.forEach(function(cls) { $(cls).hide(); });
         }
         else if (selectedType === 'CAIXINHA') {
             camposCaixinha.forEach(function(cls) { $(cls).show(); });
             camposGerais.forEach(function(cls) { $(cls).hide(); });
+            camposSolicitacao.forEach(function(cls) { $(cls).hide(); });
         }
     }
 

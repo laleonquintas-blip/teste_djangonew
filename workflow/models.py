@@ -57,7 +57,7 @@ class Despesa(models.Model):
     nome_cobriu = models.CharField(max_length=150, blank=True, null=True, verbose_name="Nome de Quem Cobriu")
     forma_pagamento = models.CharField(max_length=10, choices=FORMA_PAGTO_CHOICES, blank=True, null=True,
                                        verbose_name="Forma Pagamento")
-    dados_bancarios_pagto = models.TextField(blank=True, null=True, verbose_name="Dados para Pagamento")
+    dados_bancarios_pagto = models.TextField(blank=True, null=True, verbose_name="Dados para Depósito")
 
     # Aprovação e Execução
     empresa_pagadora = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True,

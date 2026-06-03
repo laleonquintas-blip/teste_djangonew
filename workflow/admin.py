@@ -328,12 +328,13 @@ class DespesaAdmin(admin.ModelAdmin):
             'all': ('css/admin_fixes.css',)
         }
 
-    list_display = ('id', 'tipo_badge', 'solicitante', 'despesa_display', 'valor_formatado',
-                    'data_solicitacao', 'hora_solicitacao', 'status_badge', 'botao_detalhes')
+    list_display = ('id', 'data_criacao_display', 'tipo_badge', 'solicitante', 'despesa_display',
+                    'valor_formatado', 'data_ultimo_status', 'hora_ultimo_status', 'status_badge', 'botao_detalhes')
     list_filter = (
         'tipo_lancamento',
         'status',
         ('data_criacao', DateRangeFilterBuilder(title='Data da Solicitação')),
+        ('data_ultima_alteracao', DateRangeFilterBuilder(title='Última Troca de Status')),
         WfIdFilter,
         WfSolicitanteFilter,
         WfDespesaFilter,
@@ -452,7 +453,7 @@ class DespesaAdmin(admin.ModelAdmin):
                 ('solicitante', 'comprovante'),
                 'observacoes'
             )
-        else:
+        elif tipo == 'SOLICITACAO':
             campos_lancamento = (
                 'tipo_reserva',
                 ('tipo_lancamento', 'data_despesa'),
@@ -460,7 +461,19 @@ class DespesaAdmin(admin.ModelAdmin):
                 ('tomador', 'filial'),
                 ('motivo_ausencia', 'colaborador_faltou'),
                 ('inicio_cobertura', 'fim_cobertura'),
-                ('solicitante', 'comprovante'),
+                'solicitante',
+                ('nome_cobriu', 'dados_bancarios_pagto'),
+                'observacoes'
+            )
+        else:  # EXTRA
+            campos_lancamento = (
+                'tipo_reserva',
+                ('tipo_lancamento', 'data_despesa'),
+                ('fornecedor', 'valor'),
+                ('tomador', 'filial'),
+                ('motivo_ausencia', 'colaborador_faltou'),
+                ('inicio_cobertura', 'fim_cobertura'),
+                'solicitante',
                 'observacoes'
             )
 
@@ -796,25 +809,32 @@ class DespesaAdmin(admin.ModelAdmin):
 
     botao_detalhes.short_description = "Ação"
 
-    def data_solicitacao(self, obj):
+    def data_criacao_display(self, obj):
         if obj.data_criacao:
             from django.utils import timezone as tz
-            local = tz.localtime(obj.data_criacao)
-            return local.strftime('%d/%m/%Y')
+            return tz.localtime(obj.data_criacao).strftime('%d/%m/%Y')
         return '—'
 
-    data_solicitacao.short_description = "Data"
-    data_solicitacao.admin_order_field = 'data_criacao'
+    data_criacao_display.short_description = "Criado em"
+    data_criacao_display.admin_order_field = 'data_criacao'
 
-    def hora_solicitacao(self, obj):
-        if obj.data_criacao:
+    def data_ultimo_status(self, obj):
+        if obj.data_ultima_alteracao:
             from django.utils import timezone as tz
-            local = tz.localtime(obj.data_criacao)
-            return local.strftime('%H:%M')
+            return tz.localtime(obj.data_ultima_alteracao).strftime('%d/%m/%Y')
         return '—'
 
-    hora_solicitacao.short_description = "Hora"
-    hora_solicitacao.admin_order_field = 'data_criacao'
+    data_ultimo_status.short_description = "Últ. Status"
+    data_ultimo_status.admin_order_field = 'data_ultima_alteracao'
+
+    def hora_ultimo_status(self, obj):
+        if obj.data_ultima_alteracao:
+            from django.utils import timezone as tz
+            return tz.localtime(obj.data_ultima_alteracao).strftime('%H:%M')
+        return '—'
+
+    hora_ultimo_status.short_description = "Hora"
+    hora_ultimo_status.admin_order_field = 'data_ultima_alteracao'
 
     def dialogo_display(self, obj):
         """Exibe o histórico de ações como um diálogo cronológico."""

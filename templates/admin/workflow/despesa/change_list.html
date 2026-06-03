@@ -63,6 +63,18 @@
             </div>
         </div>
 
+        <div class="cfb-field cfb-date-range" style="flex:2;min-width:260px;">
+            <div class="cfb-sub">
+                <label>Últ. Status De</label>
+                <input type="date" id="cfb_alt_ini" data-cfb-param="data_ultima_alteracao__range__gte">
+            </div>
+            <span class="cfb-sep">até</span>
+            <div class="cfb-sub">
+                <label>&nbsp;</label>
+                <input type="date" id="cfb_alt_fim" data-cfb-param="data_ultima_alteracao__range__lte">
+            </div>
+        </div>
+
         <div class="cfb-field" style="min-width:160px;">
             <label>Status</label>
             <select id="cfb_status" data-cfb-param="status">
@@ -81,6 +93,8 @@
             desp_q:  cfbVal('cfb_desp'),
             'data_criacao__range__gte': cfbVal('cfb_data_ini'),
             'data_criacao__range__lte': cfbVal('cfb_data_fim'),
+            'data_ultima_alteracao__range__gte': cfbVal('cfb_alt_ini'),
+            'data_ultima_alteracao__range__lte': cfbVal('cfb_alt_fim'),
             status:  cfbVal('cfb_status')
         })">🔍 Pesquisar</button>
         <button type="button" class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
