@@ -6,6 +6,12 @@ from django.utils.safestring import mark_safe
 from django import forms
 from django.utils import timezone
 from django.contrib.auth.models import Group
+import io, zipfile, os, mimetypes
+from django.http import HttpResponse
+from django.conf import settings
+import cloudinary
+import cloudinary.uploader
+import urllib.request
 
 from rangefilter.filters import DateRangeFilterBuilder
 
@@ -327,6 +333,66 @@ class DespesaAdmin(admin.ModelAdmin):
         css = {
             'all': ('css/admin_fixes.css',)
         }
+
+    actions = ['baixar_e_limpar_comprovantes']
+
+    def baixar_e_limpar_comprovantes(self, request, queryset):
+        if not request.user.is_superuser:
+            self.message_user(request, "Acesso negado: apenas superusuários podem executar esta ação.", level='error')
+            return
+
+        cfg = settings.CLOUDINARY_STORAGE
+        cloudinary.config(
+            cloud_name=cfg['CLOUD_NAME'],
+            api_key=cfg['API_KEY'],
+            api_secret=cfg['API_SECRET'],
+        )
+
+        com_comprovante = queryset.exclude(comprovante='').exclude(comprovante__isnull=True)
+        if not com_comprovante.exists():
+            self.message_user(request, "Nenhuma das ocorrências selecionadas possui comprovante.", level='warning')
+            return
+
+        buffer = io.BytesIO()
+        total, erros = 0, 0
+
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for despesa in com_comprovante:
+                try:
+                    url = despesa.comprovante.url
+                    with urllib.request.urlopen(url) as resp:
+                        data = resp.read()
+                        content_type = resp.headers.get('Content-Type', '').split(';')[0].strip()
+                        ext = mimetypes.guess_extension(content_type) or ''
+                        ext = {'.jpe': '.jpg', '.jpeg': '.jpg'}.get(ext, ext)
+                    if not ext:
+                        _, ext = os.path.splitext(despesa.comprovante.name)
+                    ext = ext.lstrip('.').lower() or 'bin'
+                    nome_arquivo = f"ocorrencia_{despesa.id}_comprovante.{ext}"
+                    zf.writestr(nome_arquivo, data)
+
+                    # Remove do Cloudinary usando o public_id
+                    public_id = despesa.comprovante.name.rsplit('.', 1)[0]
+                    cloudinary.uploader.destroy(public_id, resource_type='raw', invalidate=True)
+                    cloudinary.uploader.destroy(public_id, resource_type='image', invalidate=True)
+
+                    despesa.comprovante = None
+                    despesa.save(update_fields=['comprovante'])
+                    total += 1
+                except Exception:
+                    erros += 1
+
+        buffer.seek(0)
+        response = HttpResponse(buffer, content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename="comprovantes_malupe.zip"'
+
+        msg = f"{total} comprovante(s) baixado(s) e removido(s) da nuvem."
+        if erros:
+            msg += f" {erros} arquivo(s) com erro (mantidos na nuvem)."
+        self.message_user(request, msg)
+        return response
+
+    baixar_e_limpar_comprovantes.short_description = "⬇ Baixar comprovantes e liberar espaço na nuvem"
 
     list_display = ('id', 'data_criacao_display', 'tipo_badge', 'solicitante', 'despesa_display',
                     'valor_formatado', 'data_ultimo_status', 'hora_ultimo_status', 'status_badge', 'botao_detalhes')

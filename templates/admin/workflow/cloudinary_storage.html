@@ -1,0 +1,151 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Armazenamento Cloudinary{% endblock %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{% url 'admin:index' %}">Início</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'admin:app_list' app_label='workflow' %}">Workflow</a></li>
+  <li class="breadcrumb-item active">Armazenamento Cloudinary</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px;">
+
+  {{block.super}}
+
+  <!-- Barra de uso -->
+  <div style="background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:18px 22px; margin-bottom:24px; box-shadow:0 1px 4px rgba(0,0,0,.06);" class="cloudinary-usage-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+      <span style="font-weight:600; font-size:15px; color:#555;">
+        <i class="fas fa-cloud-upload-alt" style="color:#3498db; margin-right:8px;"></i>
+        Uso do Armazenamento
+      </span>
+      <span id="cloud-label" style="font-size:13px; color:#888;">Carregando...</span>
+    </div>
+    <div style="background:#e9ecef; border-radius:6px; height:14px; overflow:hidden;">
+      <div id="cloud-bar" style="width:0%; height:100%; border-radius:6px; background:#3498db; transition:width .6s ease;"></div>
+    </div>
+    <div id="cloud-footer" style="font-size:12px; color:#aaa; margin-top:6px; text-align:right;"></div>
+  </div>
+
+  <!-- Tabela de comprovantes -->
+  <div style="background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:18px 22px; box-shadow:0 1px 4px rgba(0,0,0,.06);" class="cloudinary-usage-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+      <h5 style="margin:0; font-size:15px; font-weight:600; color:#555;">
+        <i class="fas fa-file-alt" style="color:#3498db; margin-right:8px;"></i>
+        Comprovantes na nuvem
+        <span style="font-size:12px; color:#aaa; font-weight:400; margin-left:6px;">({{ despesas|length }} arquivo{{ despesas|length|pluralize }})</span>
+      </h5>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" onclick="selecionarTodos()" class="btn btn-sm btn-outline-secondary">Selecionar todos</button>
+        <button type="button" onclick="deselecionarTodos()" class="btn btn-sm btn-outline-secondary">Limpar seleção</button>
+        <button type="button" id="btn-baixar" onclick="confirmarDownload()" class="btn btn-sm btn-primary" disabled>
+          <i class="fas fa-download"></i> Baixar e liberar espaço (<span id="qtd-sel">0</span>)
+        </button>
+      </div>
+    </div>
+
+    {% if despesas %}
+    <form id="form-download" method="post" action="">
+      {% csrf_token %}
+      <div style="overflow-x:auto;">
+        <table class="table table-sm table-hover" style="font-size:13px;">
+          <thead>
+            <tr>
+              <th style="width:40px;"></th>
+              <th>Id</th>
+              <th>Tipo</th>
+              <th>Solicitante</th>
+              <th>Despesa</th>
+              <th>Valor</th>
+              <th>Status</th>
+              <th>Arquivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in despesas %}
+            <tr>
+              <td><input type="checkbox" name="ids" value="{{ d.id }}" class="item-check" onchange="atualizarBotao()"></td>
+              <td><a href="{% url 'admin:workflow_despesa_change' d.id %}" target="_blank">#{{ d.id }}</a></td>
+              <td>{{ d.get_tipo_lancamento_display }}</td>
+              <td>{{ d.solicitante.get_full_name|default:d.solicitante.username }}</td>
+              <td>{{ d.fornecedor }}</td>
+              <td>R$ {{ d.valor }}</td>
+              <td>{{ d.get_status_display }}</td>
+              <td>
+                <a href="{{ d.comprovante.url }}" target="_blank" style="font-size:12px;">
+                  <i class="fas fa-external-link-alt"></i> Ver arquivo
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
+    {% else %}
+    <div style="text-align:center; padding:40px; color:#aaa;">
+      <i class="fas fa-check-circle" style="font-size:32px; color:#27ae60; display:block; margin-bottom:10px;"></i>
+      Nenhum comprovante armazenado na nuvem.
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<style>
+body.dark-mode .cloudinary-usage-card {
+  background:#1e2a3a !important;
+  border-color:#2d3f52 !important;
+}
+body.dark-mode .cloudinary-usage-card span,
+body.dark-mode .cloudinary-usage-card h5 { color:#b0c4de !important; }
+body.dark-mode .table { color:#d0dce8 !important; }
+body.dark-mode .table thead th { background:#162030 !important; color:#90b4ce !important; border-color:#2d3f52 !important; }
+body.dark-mode .table tbody tr { background:#1e2a3a !important; }
+body.dark-mode .table tbody tr:hover { background:#253549 !important; }
+body.dark-mode .table td, body.dark-mode .table th { border-color:#2d3f52 !important; }
+</style>
+
+<script>
+// Carrega barra de uso
+fetch('/admin/api/cloudinary-usage/')
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) return;
+    var pct = d.percent;
+    var color = pct > 80 ? '#e74c3c' : pct > 50 ? '#f39c12' : '#3498db';
+    var labelColor = pct > 80 ? '#e74c3c' : pct > 50 ? '#f39c12' : '#27ae60';
+    document.getElementById('cloud-bar').style.width = pct + '%';
+    document.getElementById('cloud-bar').style.background = color;
+    document.getElementById('cloud-label').innerHTML =
+      d.used + ' GB usados de ' + d.limit + ' GB &nbsp;|&nbsp; <strong style="color:' + labelColor + '">' + pct + '% utilizado</strong>';
+    document.getElementById('cloud-footer').textContent = d.available + ' GB disponíveis';
+  });
+
+function atualizarBotao() {
+  var qtd = document.querySelectorAll('.item-check:checked').length;
+  document.getElementById('qtd-sel').textContent = qtd;
+  document.getElementById('btn-baixar').disabled = qtd === 0;
+}
+
+function selecionarTodos() {
+  document.querySelectorAll('.item-check').forEach(c => c.checked = true);
+  atualizarBotao();
+}
+
+function deselecionarTodos() {
+  document.querySelectorAll('.item-check').forEach(c => c.checked = false);
+  atualizarBotao();
+}
+
+function confirmarDownload() {
+  var qtd = document.querySelectorAll('.item-check:checked').length;
+  if (!confirm(qtd + ' comprovante(s) serão baixados e REMOVIDOS da nuvem. Esta ação não pode ser desfeita.\n\nConfirmar?')) return;
+  document.getElementById('form-download').submit();
+}
+</script>
+{% endblock %}

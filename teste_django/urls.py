@@ -4,6 +4,7 @@ URL configuration for teste_django project.
 from django.contrib import admin
 from django.urls import path
 from financeiro.views import get_fornecedor_info, dashboard_financeiro, gerar_fixos_mensais, ajustar_saldos_bancos
+from extras.views import cloudinary_usage_api, cloudinary_storage_page
 
 # --- PERSONALIZAÇÃO DO SISTEMA MALUPE ---
 admin.site.site_header = "Sistema Financeiro Malupe"
@@ -15,7 +16,8 @@ urlpatterns = [
     path('admin/financeiro/dashboard-gerencial/', dashboard_financeiro, name='dashboard_gerencial'),
     path('admin/financeiro/gerar-fixos/', gerar_fixos_mensais, name='gerar_fixos_mensais'),
     path('admin/financeiro/ajustar-saldos/', ajustar_saldos_bancos, name='ajustar_saldos'),
-
+    path('admin/api/cloudinary-usage/', cloudinary_usage_api, name='api_cloudinary_usage'),
+    path('admin/workflow/cloudinary-storage/', cloudinary_storage_page, name='cloudinary_storage_page'),
 
     # 2. API
     path('api/fornecedor-info/', get_fornecedor_info, name='api_fornecedor_info'),

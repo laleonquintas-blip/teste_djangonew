@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'workflow',
     'import_export',
     'rangefilter',
+    'cloudinary_storage',
+    'cloudinary',
 ]
 
 MIDDLEWARE = [
@@ -139,8 +141,17 @@ JAZZMIN_SETTINGS = {
         "workflow.Despesa": "fas fa-tasks",
     },
 
-    # 1. ADICIONA LINKS CUSTOMIZADOS NO MENU FINANCEIRO
+    # 1. ADICIONA LINKS CUSTOMIZADOS NO MENU
     "custom_links": {
+        "workflow": [
+            {
+                "name": "Armazenamento Cloudinary",
+                "url": "/admin/workflow/cloudinary-storage/",
+                "icon": "fas fa-cloud",
+                "new_window": False,
+                "permissions": ["workflow.view_cloudinary_storage"]
+            }
+        ],
         "financeiro": [
             {
                 "name": "Dashboard Gerencial",
@@ -173,9 +184,16 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 GOOGLE_DRIVE_STORAGE_JSON_KEY_FILE = os.path.join(BASE_DIR, 'credenciais_google.json')
 GOOGLE_DRIVE_STORAGE_MEDIA_ROOT = 'Comprovantes_Sistema'
 
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': 'ds9n2rkyo',
+    'API_KEY': '733989471979351',
+    'API_SECRET': 'CO6IduJlGQFyGDKIegL6UOd3qCE',
+    'RESOURCE_TYPE': 'auto',
+}
+
 STORAGES = {
     "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "BACKEND": "cloudinary_storage.storage.RawMediaCloudinaryStorage",
     },
     "staticfiles": {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",

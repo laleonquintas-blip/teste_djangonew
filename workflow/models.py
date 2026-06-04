@@ -81,6 +81,9 @@ class Despesa(models.Model):
     class Meta:
         verbose_name = "Workflow de Despesa"
         verbose_name_plural = "Workflow de Despesas"
+        permissions = [
+            ('view_cloudinary_storage', 'Pode acessar armazenamento Cloudinary'),
+        ]
 
 
 class LogWorkflow(models.Model):
