@@ -814,7 +814,8 @@ class DespesaAdmin(admin.ModelAdmin):
             qs = response.context_data['cl'].queryset
         except (AttributeError, KeyError):
             qs = Despesa.objects.none()
-        metrics = qs.order_by().values('status').annotate(total_valor=Sum('valor', distinct=True), total_qtd=Count('id', distinct=True))
+        ids_distintos = qs.order_by().values_list('id', flat=True).distinct()
+        metrics = Despesa.objects.filter(id__in=ids_distintos).values('status').annotate(total_valor=Sum('valor'), total_qtd=Count('id'))
         summary = []
         for item in metrics:
             st = item['status']
