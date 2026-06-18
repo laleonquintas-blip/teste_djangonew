@@ -1,6 +1,7 @@
 # financeiro/admin.py
 
 from django.utils.safestring import mark_safe
+from django.utils.html import format_html
 from datetime import date
 from django.shortcuts import render, redirect
 from django.contrib import admin
@@ -11,8 +12,10 @@ from dateutil.relativedelta import relativedelta
 from django.contrib import messages
 from django.urls import path
 
-from .models import ContasAPagar, ContasAReceber, BaseSaldo, GerarFixo, Transferencia
+from .models import ContasAPagar, ContasAReceber, BaseSaldo, GerarFixo, Transferencia, SaldoSupervisor, MovimentacaoSupervisor
 from cadastros.models import Cliente
+from django.contrib.auth.models import Group
+from core.models import UsuarioCustomizado
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +196,22 @@ class EmpresaPagadoraFilter(admin.SimpleListFilter):
             return queryset.filter(empresa_pagadora__id=self.value())
 
 
+class ResponsavelPagamentoFilter(admin.SimpleListFilter):
+    title = 'Responsável pelo Pagamento'
+    parameter_name = 'responsavel_pagamento'
+
+    def lookups(self, request, model_admin):
+        grupos_permitidos = Group.objects.filter(name__in=['Aprovador Financeiro', 'Operador'])
+        usuarios = UsuarioCustomizado.objects.filter(
+            groups__in=grupos_permitidos
+        ).distinct().order_by('first_name', 'last_name')
+        return [(u.id, u.get_full_name() or u.username) for u in usuarios]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(responsavel_pagamento__id=self.value())
+
+
 class EmpresaPrestadoraFilter(admin.SimpleListFilter):
     title = 'Empresa Prestadora'
     parameter_name = 'empresa_prestadora'
@@ -313,13 +332,14 @@ def gerar_fixos_mensais(modeladmin, request, queryset):
 
 # --- 1. CONTAS A PAGAR ---
 class ContasAPagarAdmin(ImportExportModelAdmin):
-    list_display = ('nota', 'fornecedor', 'vencimento', 'valor', 'status_visual', 'data_baixa', 'usuario_baixa')
+    list_display = ('nota', 'fornecedor', 'vencimento', 'valor', 'status_visual', 'responsavel_pagamento', 'data_baixa', 'usuario_baixa')
     search_fields = ('fornecedor__razao_social', 'nota', 'observacoes')
     list_filter = (
         StatusFilter,
         ('vencimento', DateRangeFilter),
         ('data_baixa', DateRangeFilter),
         EmpresaPagadoraFilter,
+        ResponsavelPagamentoFilter,
         NotaSearchFilter,
         FornecedorSearchFilter,
     )
@@ -328,7 +348,23 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
     exclude = ('nota',)
     actions = [marcar_como_pago, marcar_como_cancelado, marcar_como_pendente, gerar_fixos_mensais]
 
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        grupos_permitidos = Group.objects.filter(name__in=['Aprovador Financeiro', 'Operador'])
+        qs = UsuarioCustomizado.objects.filter(groups__in=grupos_permitidos).distinct().order_by('first_name', 'last_name')
+        if 'responsavel_pagamento' in form.base_fields:
+            form.base_fields['responsavel_pagamento'].queryset = qs
+            form.base_fields['responsavel_pagamento'].empty_label = '— Não atribuído —'
+        grupo_adm = Group.objects.filter(name='Administrativo').first()
+        if grupo_adm and 'supervisor' in form.base_fields:
+            form.base_fields['supervisor'].queryset = UsuarioCustomizado.objects.filter(
+                groups=grupo_adm
+            ).order_by('first_name', 'last_name')
+            form.base_fields['supervisor'].empty_label = '— Nenhum —'
+        return form
+
     def changelist_view(self, request, extra_context=None):
+        from django.db.models import Sum
         extra = extra_context or {}
         extra['custom_filter_template'] = 'admin/financeiro/contasapagar/_filters.html'
         extra['empresas_opts'] = list(
@@ -336,12 +372,52 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
             .values_list('empresa_pagadora__id', 'empresa_pagadora__nome')
             .distinct().order_by('empresa_pagadora__nome')
         )
-        return super().changelist_view(request, extra_context=extra)
+        grupos_permitidos = Group.objects.filter(name__in=['Aprovador Financeiro', 'Operador'])
+        usuarios = UsuarioCustomizado.objects.filter(
+            groups__in=grupos_permitidos
+        ).distinct().order_by('first_name', 'last_name')
+        extra['responsaveis_opts'] = [
+            (u.id, u.first_name.strip() or u.username)
+            for u in usuarios
+        ]
+        response = super().changelist_view(request, extra_context=extra)
+        try:
+            qs = response.context_data['cl'].queryset
+            total = qs.aggregate(t=Sum('valor'))['t'] or 0
+            response.context_data['total_filtrado_fmt'] = '{:,.2f}'.format(float(total)).replace(',', 'X').replace('.', ',').replace('X', '.')
+        except (AttributeError, KeyError):
+            pass
+        return response
 
     def save_model(self, request, obj, form, change):
+        # Se CP for pago com supervisor, garante que existe um ciclo aberto (cria se necessário)
+        if obj.status == 'PAGO' and obj.supervisor_id:
+            status_anterior = None
+            if obj.pk:
+                try:
+                    status_anterior = ContasAPagar.objects.get(pk=obj.pk).status
+                except ContasAPagar.DoesNotExist:
+                    pass
+            status_mudou = status_anterior != 'PAGO'
+            if status_mudou:
+                saldo_aberto = SaldoSupervisor.objects.filter(
+                    supervisor_id=obj.supervisor_id, status='ABERTO'
+                ).first()
+                if not saldo_aberto:
+                    supervisor = UsuarioCustomizado.objects.get(pk=obj.supervisor_id)
+                    saldo_aberto = SaldoSupervisor.objects.create(supervisor=supervisor)
+                    nome = supervisor.first_name.strip() or supervisor.username
+                    self.message_user(
+                        request,
+                        f"✅ Ciclo de saldo criado automaticamente para {nome} ({saldo_aberto.numero}).",
+                        level='SUCCESS'
+                    )
         if obj.status == 'PAGO' and not obj.usuario_baixa:
             obj.usuario_baixa = request.user
         obj.save(request=request)
+
+    class Media:
+        js = ('js/cp_plano_de_contas.js',)
 
 
 # --- 2. CONTAS A RECEBER ---
@@ -362,6 +438,7 @@ class ContasAReceberAdmin(ImportExportModelAdmin):
     actions = [marcar_como_pago, marcar_como_cancelado, marcar_como_pendente]
 
     def changelist_view(self, request, extra_context=None):
+        from django.db.models import Sum
         extra = extra_context or {}
         extra['custom_filter_template'] = 'admin/financeiro/contasareceber/_filters.html'
         extra['empresas_opts'] = list(
@@ -369,7 +446,14 @@ class ContasAReceberAdmin(ImportExportModelAdmin):
             .values_list('empresa_prestadora__id', 'empresa_prestadora__nome')
             .distinct().order_by('empresa_prestadora__nome')
         )
-        return super().changelist_view(request, extra_context=extra)
+        response = super().changelist_view(request, extra_context=extra)
+        try:
+            qs = response.context_data['cl'].queryset
+            total = qs.aggregate(t=Sum('valor'))['t'] or 0
+            response.context_data['total_filtrado_fmt'] = '{:,.2f}'.format(float(total)).replace(',', 'X').replace('.', ',').replace('X', '.')
+        except (AttributeError, KeyError):
+            pass
+        return response
 
     def save_model(self, request, obj, form, change):
         if obj.status == 'PAGO' and not obj.usuario_baixa:
@@ -544,8 +628,109 @@ class TransferenciaAdmin(admin.ModelAdmin):
         return ('criado_por', 'data_devolucao')
 
 
+# ── Saldo Supervisores ──────────────────────────────────────────────────────
+
+class MovimentacaoInline(admin.TabularInline):
+    model = MovimentacaoSupervisor
+    extra = 0
+    readonly_fields = ('data', 'tipo_display', 'valor_display', 'descricao', 'link_origem')
+    fields = ('data', 'tipo_display', 'valor_display', 'descricao', 'link_origem')
+    can_delete = False
+    ordering = ('-data', '-id')
+    verbose_name = "Movimentação"
+    verbose_name_plural = "Histórico de Movimentações"
+
+    def tipo_display(self, obj):
+        if obj.tipo == 'CREDITO':
+            return format_html('<span style="color:#27ae60;font-weight:bold;">⬆ Crédito</span>')
+        return format_html('<span style="color:#e74c3c;font-weight:bold;">⬇ Débito</span>')
+    tipo_display.short_description = "Tipo"
+
+    def valor_display(self, obj):
+        cor = '#27ae60' if obj.tipo == 'CREDITO' else '#e74c3c'
+        sinal = '+' if obj.tipo == 'CREDITO' else '-'
+        return format_html(
+            '<span style="color:{};font-weight:bold;">{} R$ {}</span>',
+            cor, sinal, f'{obj.valor:,.2f}'
+        )
+    valor_display.short_description = "Valor"
+
+    def link_origem(self, obj):
+        from django.urls import reverse
+        if obj.referencia_despesa_id:
+            url = reverse('admin:workflow_despesa_change', args=[obj.referencia_despesa_id])
+            return format_html('<a href="{}" target="_blank">🔗 WF #{}</a>', url, obj.referencia_despesa_id)
+        if obj.referencia_cp_id:
+            url = reverse('admin:financeiro_contasapagar_change', args=[obj.referencia_cp_id])
+            return format_html('<a href="{}" target="_blank">🔗 CP {}</a>', url, obj.referencia_cp)
+        return '—'
+    link_origem.short_description = "Origem"
+
+
+class SaldoSupervisorAdmin(admin.ModelAdmin):
+    change_form_template = 'admin/financeiro/saldosupervisor/change_form.html'
+    list_display = ('numero', 'nome_supervisor', 'data_inicio', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display', 'status')
+    list_filter = ('status',)
+    readonly_fields = ('numero', 'supervisor', 'saldo_disponivel', 'data_inicio', 'status', 'fechado_por', 'data_fechamento', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display')
+    fields = ('numero', 'supervisor', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display', 'data_inicio', 'status', 'fechado_por', 'data_fechamento')
+    inlines = [MovimentacaoInline]
+    actions = ['fechar_ciclo']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def response_change(self, request, obj):
+        if '_fechar_ciclo_btn' in request.POST and obj.status == 'ABERTO':
+            from django.utils import timezone as tz
+            obj.status = 'FECHADO'
+            obj.fechado_por = request.user
+            obj.data_fechamento = tz.now()
+            obj.observacao_fechamento = request.POST.get('observacao_fechamento', '').strip()
+            obj.save()
+            self.message_user(request, f"Ciclo {obj.numero} fechado com sucesso.")
+            from django.http import HttpResponseRedirect
+            from django.urls import reverse
+            return HttpResponseRedirect(reverse('admin:financeiro_saldosupervisor_changelist'))
+        return super().response_change(request, obj)
+
+    def fechar_ciclo(self, request, queryset):
+        from django.utils import timezone as tz
+        fechados = 0
+        for saldo in queryset.filter(status='ABERTO'):
+            saldo.status = 'FECHADO'
+            saldo.fechado_por = request.user
+            saldo.data_fechamento = tz.now()
+            saldo.save()
+            fechados += 1
+        self.message_user(request, f"{fechados} linha(s) fechada(s) com sucesso.")
+    fechar_ciclo.short_description = "Fechar ciclo selecionado"
+
+    def nome_supervisor(self, obj):
+        nome = obj.supervisor.first_name.strip() if obj.supervisor.first_name else ''
+        return nome or obj.supervisor.username
+    nome_supervisor.short_description = "Supervisor"
+
+    def saldo_disponivel_display(self, obj):
+        return format_html('<span style="color:#27ae60;font-weight:bold;">R$ {}</span>', f'{obj.saldo_disponivel:,.2f}')
+    saldo_disponivel_display.short_description = "Saldo Disponível"
+
+    def utilizacao_display(self, obj):
+        return format_html('<span style="color:#e74c3c;font-weight:bold;">R$ {}</span>', f'{obj.utilizacao:,.2f}')
+    utilizacao_display.short_description = "Utilização"
+
+    def saldo_display(self, obj):
+        saldo = obj.saldo
+        cor = '#27ae60' if saldo >= 0 else '#e74c3c'
+        return format_html('<span style="color:{};font-weight:bold;">R$ {}</span>', cor, f'{saldo:,.2f}')
+    saldo_display.short_description = "Saldo"
+
+
 # --- REGISTROS FINAIS ---
 admin.site.register(ContasAPagar, ContasAPagarAdmin)
 admin.site.register(ContasAReceber, ContasAReceberAdmin)
 admin.site.register(BaseSaldo, BaseSaldoAdmin)
 admin.site.register(Transferencia, TransferenciaAdmin)
+admin.site.register(SaldoSupervisor, SaldoSupervisorAdmin)

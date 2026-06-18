@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.contrib import messages
 from datetime import date
 from django.utils.html import format_html
-from cadastros.models import Cliente, Fornecedor, Empresa, Banco, TipoServico
+from cadastros.models import Cliente, Fornecedor, Empresa, Banco, TipoServico, PlanoDeContas
 from core.models import UsuarioCustomizado
 
 STATUS_PAGAMENTO_CHOICES = [
@@ -43,8 +43,21 @@ class ContasAPagar(models.Model):
     nota = models.CharField(max_length=50, unique=True, verbose_name="Nº da Nota Fiscal")
     valor = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor (R$)")
     observacoes = models.TextField(blank=True, verbose_name="Observações")
-    conta_contabil = models.CharField(max_length=50, blank=True, verbose_name="Conta Contábil")
+    plano_de_contas = models.ForeignKey(
+        PlanoDeContas, on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="Plano de Contas"
+    )
     status = models.CharField(max_length=15, choices=STATUS_PAGAMENTO_CHOICES, default='PENDENTE', verbose_name="Status")
+    responsavel_pagamento = models.ForeignKey(
+        UsuarioCustomizado, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='contas_responsavel',
+        verbose_name="Responsável pelo Pagamento"
+    )
+    supervisor = models.ForeignKey(
+        UsuarioCustomizado, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='contas_supervisor',
+        verbose_name="Supervisor"
+    )
     data_baixa = models.DateField(null=True, blank=True, verbose_name="Data de Baixa/Pagamento")
     usuario_baixa = models.ForeignKey(UsuarioCustomizado, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Usuário da Baixa")
 
@@ -82,6 +95,32 @@ class ContasAPagar(models.Model):
                 messages.success(request, f"SUCESSO! Conta a Pagar criada: {self.nota}")
         if self.status == 'PAGO' and not self.data_baixa:
             self.data_baixa = date.today()
+        # Crédito automático no saldo do supervisor quando CP é pago
+        if self.status == 'PAGO' and self.supervisor_id:
+            if self.pk:
+                try:
+                    anterior = ContasAPagar.objects.get(pk=self.pk)
+                    status_mudou = anterior.status != 'PAGO'
+                except ContasAPagar.DoesNotExist:
+                    status_mudou = True
+            else:
+                status_mudou = True
+            if status_mudou:
+                saldo_sup = SaldoSupervisor.objects.filter(
+                    supervisor_id=self.supervisor_id, status='ABERTO'
+                ).order_by('-data_inicio').first()
+                if not saldo_sup:
+                    supervisor = UsuarioCustomizado.objects.get(pk=self.supervisor_id)
+                    saldo_sup = SaldoSupervisor.objects.create(supervisor=supervisor)
+                saldo_sup.saldo_disponivel += self.valor
+                saldo_sup.save()
+                MovimentacaoSupervisor.objects.create(
+                    saldo_supervisor=saldo_sup,
+                    tipo='CREDITO',
+                    valor=self.valor,
+                    descricao=f"CP {self.nota} — {self.fornecedor}",
+                    referencia_cp=self if self.pk else None,
+                )
         super().save(*args, **kwargs)
 
     class Meta:
@@ -273,3 +312,83 @@ class Transferencia(models.Model):
     def delete(self, *args, **kwargs):
         BaseSaldo.objects.filter(origem='TRF', id_origem=self.pk).delete()
         super().delete(*args, **kwargs)
+
+
+class SaldoSupervisor(models.Model):
+    STATUS_CHOICES = [
+        ('ABERTO', 'Aberto'),
+        ('FECHADO', 'Fechado'),
+    ]
+    numero = models.CharField(max_length=12, unique=True, blank=True, verbose_name="Nº")
+    supervisor = models.ForeignKey(
+        UsuarioCustomizado, on_delete=models.PROTECT,
+        related_name='saldos_supervisor', verbose_name="Supervisor"
+    )
+    saldo_disponivel = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Saldo Disponível")
+    data_inicio = models.DateField(default=date.today, verbose_name="Data de Início")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ABERTO', verbose_name="Status")
+    fechado_por = models.ForeignKey(
+        UsuarioCustomizado, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ciclos_fechados', verbose_name="Fechado por"
+    )
+    data_fechamento = models.DateTimeField(null=True, blank=True, verbose_name="Data do Fechamento")
+    observacao_fechamento = models.TextField(blank=True, verbose_name="Observações do Fechamento")
+
+    class Meta:
+        verbose_name = "Saldo Supervisor"
+        verbose_name_plural = "Saldo Supervisores"
+        ordering = ['-data_inicio']
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            if SaldoSupervisor.objects.filter(supervisor=self.supervisor, status='ABERTO').exists():
+                nome = self.supervisor.first_name.strip() or self.supervisor.username
+                raise ValueError(f"Já existe um saldo aberto para {nome}. Feche o ciclo atual antes de criar um novo.")
+        if not self.numero:
+            ultimo = SaldoSupervisor.objects.order_by('-id').first()
+            proximo = (ultimo.id + 1) if ultimo else 1
+            self.numero = f"SS-{proximo:05d}"
+        super().save(*args, **kwargs)
+
+    @property
+    def utilizacao(self):
+        return self.movimentacoes.filter(tipo='DEBITO').aggregate(
+            total=models.Sum('valor')
+        )['total'] or 0
+
+    @property
+    def saldo(self):
+        return self.saldo_disponivel - self.utilizacao
+
+    def __str__(self):
+        nome = self.supervisor.first_name.strip() or self.supervisor.username
+        return f"{nome} — {self.data_inicio.strftime('%d/%m/%Y')} ({self.get_status_display()})"
+
+
+class MovimentacaoSupervisor(models.Model):
+    TIPO_CHOICES = [
+        ('CREDITO', 'Crédito (Saldo)'),
+        ('DEBITO', 'Débito (Utilização)'),
+    ]
+    saldo_supervisor = models.ForeignKey(
+        SaldoSupervisor, on_delete=models.PROTECT,
+        related_name='movimentacoes', verbose_name="Saldo"
+    )
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, verbose_name="Tipo")
+    valor = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor (R$)")
+    descricao = models.CharField(max_length=200, verbose_name="Descrição")
+    data = models.DateField(auto_now_add=True, verbose_name="Data")
+    referencia_cp = models.ForeignKey(
+        'ContasAPagar', on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="Ref. Contas a Pagar"
+    )
+    referencia_despesa_id = models.IntegerField(null=True, blank=True, verbose_name="Ref. Despesa Workflow (ID)")
+
+    class Meta:
+        verbose_name = "Movimentação"
+        verbose_name_plural = "Movimentações"
+        ordering = ['-data', '-id']
+
+    def __str__(self):
+        nome = self.saldo_supervisor.supervisor.first_name.strip() or self.saldo_supervisor.supervisor.username
+        return f"{self.get_tipo_display()} R$ {self.valor} — {nome}"

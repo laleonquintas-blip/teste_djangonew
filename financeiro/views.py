@@ -18,9 +18,14 @@ from financeiro.models import ContasAPagar, ContasAReceber, Transferencia
 def get_fornecedor_info(request):
     fornecedor_id = request.GET.get('id')
     try:
-        fornecedor = Fornecedor.objects.get(id=fornecedor_id)
+        fornecedor = Fornecedor.objects.select_related('plano_de_contas').get(id=fornecedor_id)
         tipo = 'SOLICITACAO' if fornecedor.letra_acesso == 'A' else 'CAIXINHA'
-        return JsonResponse({'tipo': tipo})
+        plano = fornecedor.plano_de_contas
+        return JsonResponse({
+            'tipo': tipo,
+            'plano_de_contas_id': plano.id if plano else '',
+            'plano_de_contas_nome': str(plano) if plano else '',
+        })
     except Fornecedor.DoesNotExist:
         return JsonResponse({'tipo': 'DESCONHECIDO'}, status=404)
 

@@ -56,6 +56,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.TrocaSenhaObrigatoriaMiddleware',
 ]
 
 ROOT_URLCONF = 'teste_django.urls'
@@ -82,6 +83,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+        },
     }
 }
 
@@ -124,6 +128,7 @@ JAZZMIN_SETTINGS = {
     "custom_js": "js/admin_custom.js",
 
     "show_sidebar": True,
+    "navigation_expanded": False,
     "sidebar_nav_child_indent": True,
     "sidebar_nav_compact_style": True,
     "order_with_respect_to": ["workflow", "financeiro", "cadastros", "core"],
@@ -132,13 +137,19 @@ JAZZMIN_SETTINGS = {
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
         "auth.Group": "fas fa-users",
-        "cadastros.Cliente": "fas fa-user-tie",
-        "cadastros.Fornecedor": "fas fa-truck",
+        "workflow": "fas fa-project-diagram",
+        "workflow.Despesa": "fas fa-tasks",
+        "financeiro": "fas fa-dollar-sign",
         "financeiro.ContasAPagar": "fas fa-money-bill-wave",
         "financeiro.ContasAReceber": "fas fa-hand-holding-usd",
         "financeiro.BaseSaldo": "fas fa-chart-line",
         "financeiro.Transferencia": "fas fa-exchange-alt",
-        "workflow.Despesa": "fas fa-tasks",
+        "financeiro.SaldoSupervisor": "fas fa-user-shield",
+        "cadastros": "fas fa-database",
+        "cadastros.Cliente": "fas fa-user-tie",
+        "cadastros.Fornecedor": "fas fa-truck",
+        "cadastros.PlanoDeContas": "fas fa-sitemap",
+        "core": "fas fa-cog",
     },
 
     # 1. ADICIONA LINKS CUSTOMIZADOS NO MENU
@@ -178,6 +189,19 @@ JAZZMIN_SETTINGS = {
     "show_ui_builder": True,
 
 }
+
+JAZZMIN_UI_TWEAKS = {
+    "sidebar_fixed": True,
+    "navbar_fixed": False,
+    "footer_fixed": False,
+    "layout_boxed": False,
+    "accent": "accent-primary",
+    "navbar": "navbar-white navbar-light",
+    "sidebar": "sidebar-dark-primary",
+    "sidebar_nav_child_indent": True,
+    "sidebar_nav_compact_style": True,
+}
+
 # settings.py
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 

@@ -23,6 +23,8 @@
     .border-left-success { border-left: 5px solid #1cc88a; }
     .border-left-danger { border-left: 5px solid #e74a3b; }
     .border-left-info { border-left: 5px solid #36b9cc; }
+    .clickable-card-col { border-radius: 6px; transition: background .15s; cursor: pointer; }
+    .clickable-card-col:hover { background: rgba(0,0,0,0.05); }
 
     /* Filtro com cor diferente se estiver no passado */
     .filter-card {
@@ -160,14 +162,20 @@
                 <div class="card-body-custom">
                     <div class="row text-center">
                         <div class="col-6 border-right">
-                            <h6 class="text-danger font-weight-bold mb-1">VENCIDOS <br><small>(Antes de {{ data_referencia|date:"d/m" }})</small></h6>
-                            <h3 class="text-danger mb-0">R$ {{ cr.vencidos_valor|floatformat:2|intcomma }}</h3>
-                            <small class="badge badge-danger mt-2 mb-3">{{ cr.vencidos_qtd }} Títulos</small>
+                            <a href="/admin/financeiro/contasareceber/?status_real=VENCIDO" class="text-decoration-none d-block clickable-card-col p-2">
+                                <h6 class="text-danger font-weight-bold mb-1">VENCIDOS <br><small>(Antes de {{ data_referencia|date:"d/m" }})</small></h6>
+                                <h3 class="text-danger mb-0">R$ {{ cr.vencidos_valor|floatformat:2|intcomma }}</h3>
+                                <small class="badge badge-danger mt-2 mb-3">{{ cr.vencidos_qtd }} Títulos</small>
+                                <div><small class="text-muted"><i class="fas fa-external-link-alt"></i> Ver lista</small></div>
+                            </a>
                         </div>
                         <div class="col-6">
-                            <h6 class="text-success font-weight-bold mb-1">A VENCER <br><small>(Após {{ data_referencia|date:"d/m" }})</small></h6>
-                            <h3 class="text-success mb-0">R$ {{ cr.a_vencer_valor|floatformat:2|intcomma }}</h3>
-                            <small class="badge badge-success mt-2 mb-3">{{ cr.a_vencer_qtd }} Títulos</small>
+                            <a href="/admin/financeiro/contasareceber/?status_real=A_VENCER" class="text-decoration-none d-block clickable-card-col p-2">
+                                <h6 class="text-success font-weight-bold mb-1">A VENCER <br><small>(Após {{ data_referencia|date:"d/m" }})</small></h6>
+                                <h3 class="text-success mb-0">R$ {{ cr.a_vencer_valor|floatformat:2|intcomma }}</h3>
+                                <small class="badge badge-success mt-2 mb-3">{{ cr.a_vencer_qtd }} Títulos</small>
+                                <div><small class="text-muted"><i class="fas fa-external-link-alt"></i> Ver lista</small></div>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -182,14 +190,20 @@
                 <div class="card-body-custom">
                     <div class="row text-center">
                         <div class="col-6 border-right">
-                            <h6 class="text-danger font-weight-bold mb-1">VENCIDOS <br><small>(Antes de {{ data_referencia|date:"d/m" }})</small></h6>
-                            <h3 class="text-danger mb-0">R$ {{ cp.vencidos_valor|floatformat:2|intcomma }}</h3>
-                            <small class="badge badge-danger mt-2 mb-3">{{ cp.vencidos_qtd }} Títulos</small>
+                            <a href="/admin/financeiro/contasapagar/?status_real=VENCIDO" class="text-decoration-none d-block clickable-card-col p-2">
+                                <h6 class="text-danger font-weight-bold mb-1">VENCIDOS <br><small>(Antes de {{ data_referencia|date:"d/m" }})</small></h6>
+                                <h3 class="text-danger mb-0">R$ {{ cp.vencidos_valor|floatformat:2|intcomma }}</h3>
+                                <small class="badge badge-danger mt-2 mb-3">{{ cp.vencidos_qtd }} Títulos</small>
+                                <div><small class="text-muted"><i class="fas fa-external-link-alt"></i> Ver lista</small></div>
+                            </a>
                         </div>
                         <div class="col-6">
-                            <h6 class="text-warning font-weight-bold mb-1" style="color: #fd7e14 !important;">A VENCER <br><small>(Após {{ data_referencia|date:"d/m" }})</small></h6>
-                            <h3 class="text-warning mb-0" style="color: #fd7e14 !important;">R$ {{ cp.a_vencer_valor|floatformat:2|intcomma }}</h3>
-                            <small class="badge badge-warning mt-2 mb-3">{{ cp.a_vencer_qtd }} Títulos</small>
+                            <a href="/admin/financeiro/contasapagar/?status_real=A_VENCER" class="text-decoration-none d-block clickable-card-col p-2">
+                                <h6 class="text-warning font-weight-bold mb-1" style="color: #fd7e14 !important;">A VENCER <br><small>(Após {{ data_referencia|date:"d/m" }})</small></h6>
+                                <h3 class="text-warning mb-0" style="color: #fd7e14 !important;">R$ {{ cp.a_vencer_valor|floatformat:2|intcomma }}</h3>
+                                <small class="badge badge-warning mt-2 mb-3">{{ cp.a_vencer_qtd }} Títulos</small>
+                                <div><small class="text-muted"><i class="fas fa-external-link-alt"></i> Ver lista</small></div>
+                            </a>
                         </div>
                     </div>
                 </div>

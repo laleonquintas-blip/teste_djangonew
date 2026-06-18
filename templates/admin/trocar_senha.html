@@ -1,0 +1,38 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div style="max-width:480px;margin:60px auto;">
+    <div style="background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.10);padding:40px 36px;">
+        <div style="text-align:center;margin-bottom:28px;">
+            <span style="font-size:2.5rem;">🔒</span>
+            <h2 style="margin:12px 0 6px;color:#2c3e50;font-size:1.5rem;">Troca de Senha Obrigatória</h2>
+            <p style="color:#666;font-size:0.95rem;margin:0;">Por segurança, defina uma nova senha antes de continuar.</p>
+        </div>
+
+        {% if erro %}
+        <div style="background:#fdecea;border:1px solid #e74c3c;border-radius:6px;padding:10px 14px;margin-bottom:18px;color:#c0392b;font-size:0.9rem;">
+            ⚠️ {{ erro }}
+        </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div style="margin-bottom:18px;">
+                <label style="display:block;font-weight:600;color:#444;margin-bottom:6px;">Nova Senha</label>
+                <input type="password" name="nova_senha" required minlength="8"
+                    style="width:100%;padding:10px 12px;border:1px solid #ccd;border-radius:6px;font-size:1rem;box-sizing:border-box;"
+                    placeholder="Mínimo 8 caracteres">
+            </div>
+            <div style="margin-bottom:24px;">
+                <label style="display:block;font-weight:600;color:#444;margin-bottom:6px;">Confirmar Nova Senha</label>
+                <input type="password" name="confirma_senha" required
+                    style="width:100%;padding:10px 12px;border:1px solid #ccd;border-radius:6px;font-size:1rem;box-sizing:border-box;"
+                    placeholder="Repita a nova senha">
+            </div>
+            <button type="submit"
+                style="width:100%;padding:12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;font-size:1rem;font-weight:700;cursor:pointer;">
+                Salvar Nova Senha
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

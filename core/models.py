@@ -19,13 +19,14 @@ class UsuarioCustomizado(AbstractUser):
 
     # 2. Flag para Forçar Troca de Senha (Segurança)
     troca_senha_obrigatoria = models.BooleanField(
-        default=True,
+        default=False,
         verbose_name="Troca de Senha Obrigatória",
         help_text="O usuário deve alterar a senha no primeiro acesso."
     )
 
     def __str__(self):
-        return self.username
+        nome = self.first_name.strip()
+        return nome if nome else self.username
 
     # A CLASSE GRUPO DEVE FICAR FORA DA CLASSE USUÁRIO (SEM RECUO)
 

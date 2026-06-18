@@ -120,11 +120,27 @@ class Cliente(models.Model):
         verbose_name_plural = "Clientes"
 
 
+class PlanoDeContas(models.Model):
+    nome = models.CharField(max_length=150, verbose_name="Nome")
+    conta_contabil = models.CharField(max_length=50, blank=True, verbose_name="Conta Contábil")
+
+    def __str__(self):
+        return self.nome
+
+    class Meta:
+        verbose_name = "Plano de Contas"
+        verbose_name_plural = "Plano de Contas"
+        ordering = ['nome']
+
+
 class Fornecedor(models.Model):
     razao_social = models.CharField(max_length=200, verbose_name="Razão Social")
     cnpj_cpf = models.CharField(max_length=20, unique=True, verbose_name="CNPJ ou CPF")
     forma_pagamento = models.CharField(max_length=100, verbose_name="Forma de Pagamento", blank=True)
-    conta_contabil = models.CharField(max_length=50, verbose_name="Conta Contábil", blank=True)
+    plano_de_contas = models.ForeignKey(
+        PlanoDeContas, on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="Plano de Contas"
+    )
 
     # A letra de acesso (A, B, C...) que você mencionou no Workflow
     letra_acesso = models.CharField(max_length=5, verbose_name="Letra de Acesso (Ex: A)", default='A')

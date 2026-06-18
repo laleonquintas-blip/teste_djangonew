@@ -11,6 +11,7 @@ STATUS_WORKFLOW = [
     ('AGUARDANDO_FIN', 'Aguardando Financeiro'),
     ('DIRECIONADO_OP', 'Direcionado ao Operador'),
     ('PAGO', 'Pago / Finalizado'),
+    ('CONFERIDO', 'Conferido'),
     ('CANCELADO', 'Cancelado'),
 ]
 
@@ -46,6 +47,8 @@ class Despesa(models.Model):
 
     inicio_cobertura = models.DateField(null=True, blank=True, verbose_name="Cob Início")
     fim_cobertura = models.DateField(null=True, blank=True, verbose_name="Cob Fim")
+    dias_cobertura = models.TextField(blank=True, verbose_name="Dias de Cobertura",
+                                      help_text="Dias de cobertura!")
     tomador = models.ForeignKey(Tomador, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Tomador")
     filial = models.ForeignKey(Filial, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Filial")
     motivo_ausencia = models.ForeignKey(MotivoAusencia, on_delete=models.SET_NULL, null=True, blank=True,

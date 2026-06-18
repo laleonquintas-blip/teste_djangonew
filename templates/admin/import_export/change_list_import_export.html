@@ -6,6 +6,11 @@
     {% include custom_filter_template %}
 {% endif %}
 {{ block.super }}
+{% if total_filtrado_fmt %}
+<div style="display:flex;justify-content:flex-end;align-items:center;gap:16px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 20px;margin-top:12px;">
+    <span style="color:#856404;font-size:1.1rem;font-weight:700;">Total: R$ {{ total_filtrado_fmt }}</span>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block object-tools-items %}

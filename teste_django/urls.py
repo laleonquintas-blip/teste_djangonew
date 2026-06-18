@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.urls import path
 from financeiro.views import get_fornecedor_info, dashboard_financeiro, gerar_fixos_mensais, ajustar_saldos_bancos
 from extras.views import cloudinary_usage_api, cloudinary_storage_page
+from core.views import trocar_senha_obrigatoria
 
 # --- PERSONALIZAÇÃO DO SISTEMA MALUPE ---
 admin.site.site_header = "Sistema Financeiro Malupe"
@@ -13,6 +14,7 @@ admin.site.index_title = "Painel de Gestão"
 
 urlpatterns = [
     # 1. ROTAS CUSTOMIZADAS (Devem vir primeiro!)
+    path('admin/trocar-senha/', trocar_senha_obrigatoria, name='trocar_senha_obrigatoria'),
     path('admin/financeiro/dashboard-gerencial/', dashboard_financeiro, name='dashboard_gerencial'),
     path('admin/financeiro/gerar-fixos/', gerar_fixos_mensais, name='gerar_fixos_mensais'),
     path('admin/financeiro/ajustar-saldos/', ajustar_saldos_bancos, name='ajustar_saldos'),

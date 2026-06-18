@@ -75,6 +75,16 @@
             </div>
         </div>
 
+        <div class="cfb-field" style="min-width:140px;">
+            <label>Tipo</label>
+            <select id="cfb_tipo" data-cfb-param="tipo_lancamento">
+                <option value="">— Todos —</option>
+                <option value="CAIXINHA">Caixinha</option>
+                <option value="SOLICITACAO">Solicitação</option>
+                <option value="EXTRA">Extra</option>
+            </select>
+        </div>
+
         <div class="cfb-field" style="min-width:160px;">
             <label>Status</label>
             <select id="cfb_status" data-cfb-param="status">
@@ -95,6 +105,7 @@
             'data_criacao__range__lte': cfbVal('cfb_data_fim'),
             'data_ultima_alteracao__range__gte': cfbVal('cfb_alt_ini'),
             'data_ultima_alteracao__range__lte': cfbVal('cfb_alt_fim'),
+            tipo_lancamento: cfbVal('cfb_tipo'),
             status:  cfbVal('cfb_status')
         })">🔍 Pesquisar</button>
         <button type="button" class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>

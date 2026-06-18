@@ -1,3 +1,4 @@
+{% load humanize %}
 <div class="cfb-wrap">
     <div class="cfb-title">Filtros</div>
     <div class="cfb-row">
@@ -55,6 +56,16 @@
             </select>
         </div>
 
+        <div class="cfb-field" style="min-width:180px;">
+            <label>Responsável pelo Pagamento</label>
+            <select id="cfb_responsavel" data-cfb-param="responsavel_pagamento">
+                <option value="">— Todos —</option>
+                {% for uid, nome in responsaveis_opts %}
+                <option value="{{ uid }}">{{ nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
     </div>
     <div class="cfb-actions" style="margin-top:10px;">
         <button type="button" class="cfb-btn cfb-btn-search" onclick="cfbApply({
@@ -65,7 +76,8 @@
             'data_baixa__range__gte': cfbVal('cfb_baixa_ini'),
             'data_baixa__range__lte': cfbVal('cfb_baixa_fim'),
             status_real: cfbVal('cfb_status'),
-            empresa_pagadora: cfbVal('cfb_empresa')
+            empresa_pagadora: cfbVal('cfb_empresa'),
+            responsavel_pagamento: cfbVal('cfb_responsavel')
         })">🔍 Pesquisar</button>
         <button type="button" class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
     </div>

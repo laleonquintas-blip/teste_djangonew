@@ -1,0 +1,123 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_modify %}
+
+{% block content %}
+<div id="content-main">
+  <form {% if has_file_field %}enctype="multipart/form-data" {% endif %}action="{{ form_url }}" method="post" id="{{ opts.model_name }}_form" novalidate>
+    {% csrf_token %}
+    {% if is_popup %}<input type="hidden" name="{{ is_popup_var }}" value="1">{% endif %}
+    {% if to_field %}<input type="hidden" name="{{ to_field_var }}" value="{{ to_field }}">{% endif %}
+
+    <div class="card">
+      <div class="card-header p-0 pt-1">
+        <ul class="nav nav-tabs" id="saldoTabs" role="tablist">
+          <li class="nav-item">
+            <a class="nav-link active" id="tab-geral-link" data-toggle="tab" href="#tab-geral" role="tab">
+              📋 Dados do Ciclo
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" id="tab-historico-link" data-toggle="tab" href="#tab-historico" role="tab">
+              📜 Histórico de Movimentações
+            </a>
+          </li>
+          {% if original and original.status == 'ABERTO' %}
+          <li class="nav-item">
+            <a class="nav-link" id="tab-fechar-link" data-toggle="tab" href="#tab-fechar" role="tab">
+              🔒 Fechar Ciclo
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </div>
+
+      <div class="card-body tab-content" id="saldoTabsContent">
+
+        {# ── ABA 1: DADOS DO CICLO ── #}
+        <div class="tab-pane fade show active" id="tab-geral" role="tabpanel">
+          <div style="padding: 20px;">
+            {% for fieldset in adminform %}
+              {% include "admin/includes/fieldset.html" %}
+            {% endfor %}
+          </div>
+        </div>
+
+        {# ── ABA 2: HISTÓRICO ── #}
+        <div class="tab-pane fade" id="tab-historico" role="tabpanel">
+          <div style="padding: 20px;">
+            {% for inline_admin_formset in inline_admin_formsets %}
+              {% if inline_admin_formset.queryset %}
+                {% include inline_admin_formset.opts.template %}
+              {% else %}
+                <p style="color:#888; margin-top:10px;">Nenhuma movimentação registrada ainda.</p>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+
+        {# ── ABA 3: FECHAR CICLO ── #}
+        {% if original and original.status == 'ABERTO' %}
+        <div class="tab-pane fade" id="tab-fechar" role="tabpanel">
+          <div style="padding: 20px; max-width: 600px;">
+            <div class="alert alert-warning">
+              <strong>⚠️ Atenção:</strong> Ao fechar o ciclo, o status será alterado para <strong>Fechado</strong>
+              e não será possível registrar novas movimentações neste ciclo.
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label style="font-weight:bold; display:block; margin-bottom:6px;">Saldo Final</label>
+              <div style="font-size: 1.4em; font-weight: bold; color: {% if original.saldo >= 0 %}#27ae60{% else %}#e74c3c{% endif %};">
+                R$ {{ original.saldo }}
+              </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label for="id_observacao_fechamento" style="font-weight:bold; display:block; margin-bottom:6px;">
+                Observações do Fechamento
+              </label>
+              <textarea name="observacao_fechamento" id="id_observacao_fechamento" rows="4"
+                style="width:100%; padding:8px; border:1px solid #ced4da; border-radius:4px; font-size:14px;"
+                placeholder="Informe observações sobre o fechamento deste ciclo...">{{ original.observacao_fechamento }}</textarea>
+            </div>
+
+            <input type="hidden" name="_fechar_ciclo" value="1">
+
+            <button type="submit" name="_fechar_ciclo_btn" value="1"
+              style="background:#e74c3c; color:white; border:none; padding:10px 24px;
+                     border-radius:4px; font-weight:bold; font-size:14px; cursor:pointer;">
+              🔒 Confirmar Fechamento do Ciclo
+            </button>
+          </div>
+        </div>
+        {% endif %}
+
+      </div>{# /tab-content #}
+    </div>{# /card #}
+
+    {% block submit_buttons_bottom %}{% submit_row %}{% endblock %}
+  </form>
+</div>
+
+<style>
+  .nav-tabs .nav-link { cursor: pointer; }
+  .tab-pane { display: none; }
+  .tab-pane.show.active { display: block; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('#saldoTabs .nav-link').forEach(function (tab) {
+    tab.addEventListener('click', function (e) {
+      e.preventDefault();
+      document.querySelectorAll('#saldoTabs .nav-link').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('#saldoTabsContent .tab-pane').forEach(p => {
+        p.classList.remove('show', 'active');
+      });
+      this.classList.add('active');
+      var target = document.querySelector(this.getAttribute('href'));
+      if (target) { target.classList.add('show', 'active'); }
+    });
+  });
+});
+</script>
+{% endblock %}

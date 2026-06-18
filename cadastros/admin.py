@@ -5,7 +5,7 @@ from import_export.widgets import CharWidget
 from .models import (
     Banco, Empresa, Cliente, Fornecedor,
     Colaborador, Tomador, TipoServico,
-    MotivoAusencia, Filial
+    MotivoAusencia, Filial, PlanoDeContas
 )
 
 
@@ -80,8 +80,13 @@ class ClienteAdmin(admin.ModelAdmin):
     search_fields = ('razao_social', 'cnpj_cpf')
 
 
+class PlanoDeContasAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nome', 'conta_contabil')
+    search_fields = ('nome', 'conta_contabil')
+
+
 class FornecedorAdmin(admin.ModelAdmin):
-    list_display = ('id', 'razao_social', 'cnpj_cpf', 'letra_acesso', 'conta_contabil')
+    list_display = ('id', 'razao_social', 'cnpj_cpf', 'letra_acesso', 'plano_de_contas')
     search_fields = ('razao_social', 'cnpj_cpf')
 
 
@@ -96,3 +101,4 @@ admin.site.register(Colaborador, ColaboradorAdmin)
 admin.site.register(Filial, FilialAdmin)
 admin.site.register(Cliente, ClienteAdmin)
 admin.site.register(Fornecedor, FornecedorAdmin)
+admin.site.register(PlanoDeContas, PlanoDeContasAdmin)

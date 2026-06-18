@@ -40,6 +40,12 @@ def automacao_extras(sender, instance, created, **kwargs):
         )
 
     # 2. CONTAS A RECEBER — não sobrescreve o status se já estiver PAGO
+    def _obs_cr(inst):
+        partes = [f"Tipo: {inst.tipo_fixo}", f"NF: {inst.nota_fiscal}"]
+        if inst.filial:
+            partes.append(f"Filial: {inst.filial}")
+        return " | ".join(partes)
+
     nota_cr = f"EXTRA-{instance.nota_fiscal}"
     novo_cr, cr_created = ContasAReceber.objects.get_or_create(
         nota=nota_cr,
@@ -50,7 +56,7 @@ def automacao_extras(sender, instance, created, **kwargs):
             'data_emissao': instance.data_emissao,
             'vencimento': instance.data_vencimento,
             'valor': instance.valor_recebimento,
-            'observacoes': f"Tipo: {instance.tipo_fixo} | NF: {instance.nota_fiscal}",
+            'observacoes': _obs_cr(instance),
             'status': 'PENDENTE'
         }
     )
@@ -60,7 +66,7 @@ def automacao_extras(sender, instance, created, **kwargs):
         novo_cr.banco = instance.banco_recebimento
         novo_cr.vencimento = instance.data_vencimento
         novo_cr.valor = instance.valor_recebimento
-        novo_cr.observacoes = f"Tipo: {instance.tipo_fixo} | NF: {instance.nota_fiscal}"
+        novo_cr.observacoes = _obs_cr(instance)
         novo_cr.save()
 
     # 3. WORKFLOW (DESPESA)
@@ -74,23 +80,26 @@ def automacao_extras(sender, instance, created, **kwargs):
         novo_wf = instance.workflow_criado
         novo_wf.observacoes = f"Origem: {instance.tipo_fixo} | NF: {instance.nota_fiscal}"
         novo_wf.data_despesa = instance.data_emissao
+        novo_wf.dias_cobertura = instance.dias_cobertura
         novo_wf.save()
     else:
-        # CRIAÇÃO DO WORKFLOW
-        # Nota: Os campos de pagamento (nome_cobriu, etc) nascem vazios
-        # para o Administrativo preencher depois.
+        grupos_resp = list(instance.administrativo.groups.values_list('name', flat=True))
+        if 'Aprovador RH' in grupos_resp:
+            status_inicial = 'AGUARDANDO_RH'
+        else:
+            status_inicial = 'AGUARDANDO_ADM'
+
         novo_wf = Despesa.objects.create(
             tipo_lancamento='EXTRA',
             solicitante=instance.administrativo,
             fornecedor=fornecedor_extra,
             valor=0.00,
-            status='AGUARDANDO_ADM',
+            status=status_inicial,
             observacoes=f"Origem: {instance.tipo_fixo} | NF: {instance.nota_fiscal}",
             data_despesa=instance.data_emissao,
-
-            # Copiando apenas os dados operacionais
             inicio_cobertura=instance.inicio_cobertura,
             fim_cobertura=instance.fim_cobertura,
+            dias_cobertura=instance.dias_cobertura,
             tomador=instance.tomador,
             filial=instance.filial,
             motivo_ausencia=instance.motivo_ausencia,

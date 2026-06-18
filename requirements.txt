@@ -7,7 +7,7 @@ charset-normalizer==3.4.4
 click==8.3.1
 colorama==0.4.6
 diff-match-patch==20241021
-Django==6.0
+Django==5.2.2
 django-admin-rangefilter==0.13.3
 django-import-export==4.3.14
 django-jazzmin==3.0.1

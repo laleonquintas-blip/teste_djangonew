@@ -23,9 +23,9 @@ class LancamentoExtraAdmin(admin.ModelAdmin):
         }),
         ('Detalhes da Solicitação', {
             'fields': (
-                ('inicio_cobertura', 'fim_cobertura'),
                 ('tomador', 'filial'),
                 ('motivo_ausencia', 'colaborador_faltou'),
+                'dias_cobertura',
             )
         }),
         ('Integrações', {
@@ -56,6 +56,7 @@ class LancamentoExtraAdmin(admin.ModelAdmin):
         return form
 
     class Media:
+        js = ('js/dias_cobertura_widget.js',)
         css = {
             'all': ('css/admin_fixes.css',)
         }

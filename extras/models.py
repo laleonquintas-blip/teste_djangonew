@@ -38,14 +38,16 @@ class LancamentoExtra(models.Model):
     administrativo = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        verbose_name="Responsável Administrativo (Aprovador)",
-        limit_choices_to={'groups__name': 'Administrativo'},
+        verbose_name="Responsável (Aprovador)",
+        limit_choices_to=Q(groups__name='Administrativo') | Q(groups__name='Aprovador RH'),
         related_name='extras_solicitados'
     )
 
     # --- 4. DETALHES SOLICITAÇÃO ---
     inicio_cobertura = models.DateField("Início Cobertura", null=True, blank=True)
     fim_cobertura = models.DateField("Fim Cobertura", null=True, blank=True)
+    dias_cobertura = models.TextField("Dias de Cobertura", blank=True,
+                                      help_text="Dias de cobertura!")
     tomador = models.ForeignKey(Tomador, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Tomador")
     filial = models.ForeignKey(Filial, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Filial")
 

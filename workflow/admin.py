@@ -124,18 +124,21 @@ def _build_action_choices(grupos, status_atual, tipo_lancamento=None):
         destino_devolucao_op = 'AGUARDANDO_ADM' if tipo_lancamento == 'CAIXINHA' else 'AGUARDANDO_FIN'
         label_devolucao_op   = '↩ Devolver ao Solicitante' if tipo_lancamento == 'CAIXINHA' else '↩ Cancelar Direcionamento'
 
+        status_final = 'CONFERIDO' if tipo_lancamento == 'CAIXINHA' else 'PAGO'
+        label_final  = '✅ Conferido' if tipo_lancamento == 'CAIXINHA' else '✅ Marcar como Pago'
+
         if status_atual == 'AGUARDANDO_FIN':
             return [
                 sem_acao,
-                ('DIRECIONADO_OP',    'Direcionar ao Operador'),
-                ('PAGO',              '✅ Marcar como Pago'),
+                ('DIRECIONADO_OP',      'Direcionar ao Operador'),
+                (status_final,          label_final),
                 (destino_devolucao_fin, label_devolucao_fin),
-                ('CANCELADO',         '❌ Cancelar'),
+                ('CANCELADO',           '❌ Cancelar'),
             ]
         if status_atual == 'DIRECIONADO_OP':
             return [
                 sem_acao,
-                ('PAGO',               '✅ Marcar como Pago'),
+                (status_final,         label_final),
                 (destino_devolucao_op, label_devolucao_op),
                 ('CANCELADO',          '❌ Cancelar'),
             ]
@@ -218,9 +221,9 @@ class DespesaForm(forms.ModelForm):
         campos_livres = [
             'data_despesa', 'fornecedor', 'valor', 'observacoes',
             'solicitante', 'status', 'tipo_lancamento', 'operador',
-            'comprovante', 'inicio_cobertura', 'fim_cobertura', 'tomador', 'filial',
-            'motivo_ausencia', 'colaborador_faltou', 'nome_cobriu',
-            'forma_pagamento', 'dados_bancarios_pagto'
+            'comprovante', 'inicio_cobertura', 'fim_cobertura', 'dias_cobertura',
+            'tomador', 'filial', 'motivo_ausencia', 'colaborador_faltou',
+            'nome_cobriu', 'forma_pagamento', 'dados_bancarios_pagto'
         ]
         for campo in campos_livres:
             if campo in self.fields:
@@ -240,6 +243,8 @@ class DespesaForm(forms.ModelForm):
         if not self.instance.pk and self.request:
             cleaned_data['solicitante'] = self.request.user
             self.instance.solicitante = self.request.user
+            if not cleaned_data.get('valor'):
+                self.add_error('valor', 'Este campo é obrigatório.')
 
         if self.instance.pk:
             protegidos = [
@@ -249,11 +254,18 @@ class DespesaForm(forms.ModelForm):
 
             user = self.request.user if hasattr(self, 'request') else None
             is_admin_group = user and user.groups.filter(name='Administrativo').exists()
-            is_extra_inicial = self.instance.tipo_lancamento == 'EXTRA' and self.instance.status == 'AGUARDANDO_ADM'
+            is_rh_group = user and user.groups.filter(name='Aprovador RH').exists()
+            is_extra = self.instance.tipo_lancamento == 'EXTRA'
 
-            if is_extra_inicial and is_admin_group:
+            if is_extra and is_admin_group and self.instance.status == 'AGUARDANDO_ADM':
                 campos_editaveis_adm = ['valor', 'nome_cobriu', 'forma_pagamento', 'dados_bancarios_pagto']
                 for c in campos_editaveis_adm:
+                    if c in protegidos:
+                        protegidos.remove(c)
+
+            if is_extra and is_rh_group and self.instance.status == 'AGUARDANDO_RH':
+                campos_editaveis_rh = ['valor', 'nome_cobriu', 'forma_pagamento', 'dados_bancarios_pagto']
+                for c in campos_editaveis_rh:
                     if c in protegidos:
                         protegidos.remove(c)
 
@@ -297,7 +309,7 @@ class DespesaForm(forms.ModelForm):
                     self.add_error('justificativa_retorno',
                                    'Justificativa obrigatória ao retornar/devolver.')
 
-        # VALIDAÇÃO: bloqueia PAGO sem empresa e banco
+        # VALIDAÇÃO: bloqueia PAGO (não-caixinha) sem empresa e banco
         if status == 'PAGO':
             empresa = cleaned_data.get('empresa_pagadora')
             banco = cleaned_data.get('banco_pagador')
@@ -329,7 +341,7 @@ class DespesaAdmin(admin.ModelAdmin):
     change_form_template = "admin/workflow/despesa/change_form.html"
 
     class Media:
-        js = ('js/admin_despesa.js',)
+        js = ('js/admin_despesa.js', 'js/dias_cobertura_widget.js')
         css = {
             'all': ('css/admin_fixes.css',)
         }
@@ -414,6 +426,7 @@ class DespesaAdmin(admin.ModelAdmin):
         'AGUARDANDO_FIN': '#3498db',
         'DIRECIONADO_OP': '#9b59b6',
         'PAGO': '#27ae60',
+        'CONFERIDO': '#1a7a4a',
         'RASCUNHO': '#95a5a6',
         'CANCELADO': '#c0392b'
     }
@@ -487,15 +500,19 @@ class DespesaAdmin(admin.ModelAdmin):
             if not self.has_change_permission(request, obj):
                 return [f.name for f in self.model._meta.fields]
 
-            if obj.tipo_lancamento == 'EXTRA' and obj.status == 'AGUARDANDO_ADM' and 'Administrativo' in grupos:
-                ro_fields.extend(['solicitante', 'fornecedor', 'data_despesa', 'observacoes', 'tomador', 'filial'])
+            # ADM com ocorrência na sua fila: pode editar qualquer campo
+            if 'Administrativo' in grupos and obj.status == 'AGUARDANDO_ADM':
+                return ro_fields
+
+            # Aprovador RH com EXTRA na sua fila: libera campos de pagamento
+            if 'Aprovador RH' in grupos and obj.status == 'AGUARDANDO_RH' and obj.tipo_lancamento == 'EXTRA':
                 return ro_fields
 
             campos_travados_padrao = [
                 'solicitante', 'data_despesa', 'fornecedor', 'valor', 'observacoes',
-                'comprovante', 'inicio_cobertura', 'fim_cobertura', 'tomador', 'filial',
-                'motivo_ausencia', 'colaborador_faltou', 'nome_cobriu',
-                'forma_pagamento', 'dados_bancarios_pagto'
+                'comprovante', 'inicio_cobertura', 'fim_cobertura', 'dias_cobertura',
+                'tomador', 'filial', 'motivo_ausencia', 'colaborador_faltou',
+                'nome_cobriu', 'forma_pagamento', 'dados_bancarios_pagto'
             ]
             ro_fields.extend(campos_travados_padrao)
 
@@ -526,7 +543,7 @@ class DespesaAdmin(admin.ModelAdmin):
                 ('fornecedor', 'valor'),
                 ('tomador', 'filial'),
                 ('motivo_ausencia', 'colaborador_faltou'),
-                ('inicio_cobertura', 'fim_cobertura'),
+                'dias_cobertura',
                 'solicitante',
                 ('nome_cobriu', 'dados_bancarios_pagto'),
                 'observacoes'
@@ -538,7 +555,7 @@ class DespesaAdmin(admin.ModelAdmin):
                 ('fornecedor', 'valor'),
                 ('tomador', 'filial'),
                 ('motivo_ausencia', 'colaborador_faltou'),
-                ('inicio_cobertura', 'fim_cobertura'),
+                'dias_cobertura',
                 'solicitante',
                 'observacoes'
             )
@@ -718,6 +735,8 @@ class DespesaAdmin(admin.ModelAdmin):
                 acao_log = "Direcionou ao Operador"
             elif status_novo == 'PAGO' and 'status' in form.changed_data:
                 acao_log = "FINALIZOU (PAGO)"
+            elif status_novo == 'CONFERIDO' and 'status' in form.changed_data:
+                acao_log = "CONFERIDO"
             elif status_novo == 'CANCELADO' and 'status' in form.changed_data:
                 acao_log = "CANCELOU"
             else:
@@ -737,6 +756,9 @@ class DespesaAdmin(admin.ModelAdmin):
 
         if change and obj.status == 'PAGO' and 'status' in form.changed_data:
             self.gerar_contas_a_pagar(obj, request)
+
+        if change and obj.status == 'CONFERIDO' and obj.tipo_lancamento == 'CAIXINHA' and 'status' in form.changed_data:
+            self.registrar_utilizacao_supervisor(obj, request)
 
         super().save_model(request, obj, form, change)
 
@@ -787,6 +809,13 @@ class DespesaAdmin(admin.ModelAdmin):
             return
 
         if not ContasAPagar.objects.filter(nota=f"WF-{despesa.id}").exists():
+            partes_obs = [f"Ref. Workflow #{despesa.id} — {despesa.get_tipo_lancamento_display()}"]
+            if despesa.filial:
+                partes_obs.append(f"Filial: {despesa.filial}")
+            if despesa.nome_cobriu:
+                partes_obs.append(f"Nome quem cobriu: {despesa.nome_cobriu}")
+            if despesa.dados_bancarios_pagto:
+                partes_obs.append(f"Dados p/ pagamento: {despesa.dados_bancarios_pagto}")
             ContasAPagar.objects.create(
                 fornecedor=despesa.fornecedor,
                 empresa_pagadora=despesa.empresa_pagadora,
@@ -797,8 +826,27 @@ class DespesaAdmin(admin.ModelAdmin):
                 nota=f"WF-{despesa.id}",
                 status='PAGO',
                 data_baixa=timezone.now().date(),
-                usuario_baixa=request.user
+                usuario_baixa=request.user,
+                observacoes=" | ".join(partes_obs),
+                plano_de_contas=despesa.fornecedor.plano_de_contas,
             )
+
+    def registrar_utilizacao_supervisor(self, despesa, request):
+        from financeiro.models import SaldoSupervisor, MovimentacaoSupervisor
+        supervisor = despesa.solicitante
+        saldo_sup = SaldoSupervisor.objects.filter(
+            supervisor=supervisor, status='ABERTO'
+        ).order_by('-data_inicio').first()
+        if not saldo_sup:
+            self.message_user(request, f"⚠️ Nenhuma linha de saldo aberta para {supervisor}. Crie em Saldo Supervisores.", level='WARNING')
+            return
+        MovimentacaoSupervisor.objects.create(
+            saldo_supervisor=saldo_sup,
+            tipo='DEBITO',
+            valor=despesa.valor,
+            descricao=f"Caixinha #{despesa.id} — {despesa.fornecedor}",
+            referencia_despesa_id=despesa.id,
+        )
 
     def changelist_view(self, request, extra_context=None):
         extra = extra_context or {}
