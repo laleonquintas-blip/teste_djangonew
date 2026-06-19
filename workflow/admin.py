@@ -838,8 +838,9 @@ class DespesaAdmin(admin.ModelAdmin):
             supervisor=supervisor, status='ABERTO'
         ).order_by('-data_inicio').first()
         if not saldo_sup:
-            self.message_user(request, f"⚠️ Nenhuma linha de saldo aberta para {supervisor}. Crie em Saldo Supervisores.", level='WARNING')
-            return
+            saldo_sup = SaldoSupervisor.objects.create(supervisor=supervisor)
+            nome = supervisor.first_name.strip() or supervisor.username
+            self.message_user(request, f"Ciclo de saldo criado automaticamente para {nome} ({saldo_sup.numero}).", level='SUCCESS')
         MovimentacaoSupervisor.objects.create(
             saldo_supervisor=saldo_sup,
             tipo='DEBITO',

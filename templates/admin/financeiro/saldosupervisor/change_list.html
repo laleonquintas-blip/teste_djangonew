@@ -1,0 +1,56 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block result_list %}
+{% include "admin/custom_filter_bar.html" %}
+
+<div class="cfb-wrap">
+  <div class="cfb-title">Filtros</div>
+  <div class="cfb-row">
+
+    <div class="cfb-field" style="flex:1;min-width:140px;">
+      <label>Nº</label>
+      <input type="text" id="cfb_numero" data-cfb-param="ss_numero" placeholder="Ex: SS-00004">
+    </div>
+
+    <div class="cfb-field" style="flex:2;min-width:200px;">
+      <label>Supervisor</label>
+      <input type="text" id="cfb_supervisor" data-cfb-param="ss_supervisor" placeholder="Nome do supervisor...">
+    </div>
+
+    <div class="cfb-field cfb-date-range" style="flex:2;min-width:260px;">
+      <div class="cfb-sub">
+        <label>Data de Início De</label>
+        <input type="date" id="cfb_ini_de" data-cfb-param="ss_inicio_de">
+      </div>
+      <span class="cfb-sep">até</span>
+      <div class="cfb-sub">
+        <label>&nbsp;</label>
+        <input type="date" id="cfb_ini_ate" data-cfb-param="ss_inicio_ate">
+      </div>
+    </div>
+
+    <div class="cfb-field" style="min-width:130px;">
+      <label>Status</label>
+      <select id="cfb_status" data-cfb-param="ss_status">
+        <option value="">— Todos —</option>
+        <option value="ABERTO">Aberto</option>
+        <option value="FECHADO">Fechado</option>
+      </select>
+    </div>
+
+  </div>
+  <div class="cfb-actions" style="margin-top:10px;">
+    <button class="cfb-btn cfb-btn-search" onclick="cfbApply({
+      ss_numero: cfbVal('cfb_numero'),
+      ss_supervisor: cfbVal('cfb_supervisor'),
+      ss_inicio_de: cfbVal('cfb_ini_de'),
+      ss_inicio_ate: cfbVal('cfb_ini_ate'),
+      ss_status: cfbVal('cfb_status')
+    })">🔍 Pesquisar</button>
+    <button class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
+  </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

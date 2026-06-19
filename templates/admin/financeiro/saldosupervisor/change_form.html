@@ -1,5 +1,5 @@
 {% extends "admin/change_form.html" %}
-{% load i18n admin_modify %}
+{% load i18n admin_modify humanize %}
 
 {% block content %}
 <div id="content-main">
@@ -46,11 +46,7 @@
         <div class="tab-pane fade" id="tab-historico" role="tabpanel">
           <div style="padding: 20px;">
             {% for inline_admin_formset in inline_admin_formsets %}
-              {% if inline_admin_formset.queryset %}
-                {% include inline_admin_formset.opts.template %}
-              {% else %}
-                <p style="color:#888; margin-top:10px;">Nenhuma movimentação registrada ainda.</p>
-              {% endif %}
+              {% include inline_admin_formset.opts.template %}
             {% endfor %}
           </div>
         </div>
@@ -67,7 +63,7 @@
             <div style="margin-bottom: 16px;">
               <label style="font-weight:bold; display:block; margin-bottom:6px;">Saldo Final</label>
               <div style="font-size: 1.4em; font-weight: bold; color: {% if original.saldo >= 0 %}#27ae60{% else %}#e74c3c{% endif %};">
-                R$ {{ original.saldo }}
+                R$ {{ original.saldo|floatformat:2 }}
               </div>
             </div>
 

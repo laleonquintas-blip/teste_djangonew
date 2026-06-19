@@ -331,7 +331,39 @@ def gerar_fixos_mensais(modeladmin, request, queryset):
 
 
 # --- 1. CONTAS A PAGAR ---
+from django import forms as django_forms
+
+class ContasAPagarForm(django_forms.ModelForm):
+    def clean(self):
+        cleaned_data = super().clean()
+        status = cleaned_data.get('status')
+        supervisor = cleaned_data.get('supervisor')
+        if status == 'PAGO' and supervisor:
+            old_status = None
+            if self.instance.pk:
+                try:
+                    old_status = ContasAPagar.objects.get(pk=self.instance.pk).status
+                except ContasAPagar.DoesNotExist:
+                    pass
+            if old_status != 'PAGO':
+                saldo_aberto = SaldoSupervisor.objects.filter(
+                    supervisor=supervisor, status='ABERTO'
+                ).first()
+                if saldo_aberto:
+                    nome = supervisor.first_name.strip() or supervisor.username
+                    raise django_forms.ValidationError(
+                        f"❌ {nome} já possui um ciclo em aberto ({saldo_aberto.numero}). "
+                        f"Feche o ciclo atual em Saldo Supervisores antes de registrar novo crédito."
+                    )
+        return cleaned_data
+
+    class Meta:
+        model = ContasAPagar
+        fields = '__all__'
+
+
 class ContasAPagarAdmin(ImportExportModelAdmin):
+    form = ContasAPagarForm
     list_display = ('nota', 'fornecedor', 'vencimento', 'valor', 'status_visual', 'responsavel_pagamento', 'data_baixa', 'usuario_baixa')
     search_fields = ('fornecedor__razao_social', 'nota', 'observacoes')
     list_filter = (
@@ -390,28 +422,6 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
         return response
 
     def save_model(self, request, obj, form, change):
-        # Se CP for pago com supervisor, garante que existe um ciclo aberto (cria se necessário)
-        if obj.status == 'PAGO' and obj.supervisor_id:
-            status_anterior = None
-            if obj.pk:
-                try:
-                    status_anterior = ContasAPagar.objects.get(pk=obj.pk).status
-                except ContasAPagar.DoesNotExist:
-                    pass
-            status_mudou = status_anterior != 'PAGO'
-            if status_mudou:
-                saldo_aberto = SaldoSupervisor.objects.filter(
-                    supervisor_id=obj.supervisor_id, status='ABERTO'
-                ).first()
-                if not saldo_aberto:
-                    supervisor = UsuarioCustomizado.objects.get(pk=obj.supervisor_id)
-                    saldo_aberto = SaldoSupervisor.objects.create(supervisor=supervisor)
-                    nome = supervisor.first_name.strip() or supervisor.username
-                    self.message_user(
-                        request,
-                        f"✅ Ciclo de saldo criado automaticamente para {nome} ({saldo_aberto.numero}).",
-                        level='SUCCESS'
-                    )
         if obj.status == 'PAGO' and not obj.usuario_baixa:
             obj.usuario_baixa = request.user
         obj.save(request=request)
@@ -633,12 +643,39 @@ class TransferenciaAdmin(admin.ModelAdmin):
 class MovimentacaoInline(admin.TabularInline):
     model = MovimentacaoSupervisor
     extra = 0
-    readonly_fields = ('data', 'tipo_display', 'valor_display', 'descricao', 'link_origem')
-    fields = ('data', 'tipo_display', 'valor_display', 'descricao', 'link_origem')
+    readonly_fields = ('data', 'tipo_display', 'valor_display', 'link_origem', 'wf_data_alteracao', 'wf_observacao')
+    fields = ('data', 'tipo_display', 'valor_display', 'link_origem', 'wf_data_alteracao', 'wf_observacao')
     can_delete = False
     ordering = ('-data', '-id')
     verbose_name = "Movimentação"
     verbose_name_plural = "Histórico de Movimentações"
+
+    def has_view_permission(self, request, obj=None):
+        return True
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def _get_despesa(self, obj):
+        import re
+        from workflow.models import Despesa
+        despesa_id = obj.referencia_despesa_id
+        if not despesa_id:
+            match = re.search(r'#(\d+)', obj.descricao or '')
+            if match:
+                despesa_id = int(match.group(1))
+        if despesa_id:
+            try:
+                return Despesa.objects.get(pk=despesa_id)
+            except Despesa.DoesNotExist:
+                return None
+        return None
 
     def tipo_display(self, obj):
         if obj.tipo == 'CREDITO':
@@ -656,20 +693,46 @@ class MovimentacaoInline(admin.TabularInline):
     valor_display.short_description = "Valor"
 
     def link_origem(self, obj):
+        import re
         from django.urls import reverse
-        if obj.referencia_despesa_id:
-            url = reverse('admin:workflow_despesa_change', args=[obj.referencia_despesa_id])
-            return format_html('<a href="{}" target="_blank">🔗 WF #{}</a>', url, obj.referencia_despesa_id)
+        despesa_id = obj.referencia_despesa_id
+        if not despesa_id:
+            match = re.search(r'#(\d+)', obj.descricao or '')
+            if match:
+                despesa_id = int(match.group(1))
+        if despesa_id:
+            url = reverse('admin:workflow_despesa_change', args=[despesa_id])
+            return format_html('<a href="{}" target="_blank">WF #{}</a>', url, despesa_id)
         if obj.referencia_cp_id:
             url = reverse('admin:financeiro_contasapagar_change', args=[obj.referencia_cp_id])
-            return format_html('<a href="{}" target="_blank">🔗 CP {}</a>', url, obj.referencia_cp)
+            return format_html('<a href="{}" target="_blank">CP {}</a>', url, obj.referencia_cp)
         return '—'
-    link_origem.short_description = "Origem"
+    link_origem.short_description = "ID Origem"
+
+    def wf_data_alteracao(self, obj):
+        despesa = self._get_despesa(obj)
+        if despesa:
+            from workflow.models import LogWorkflow
+            log = LogWorkflow.objects.filter(
+                despesa=despesa, acao='CONFERIDO'
+            ).order_by('-data_hora').first()
+            if log:
+                return log.data_hora.strftime('%d/%m/%Y %H:%M')
+        return '—'
+    wf_data_alteracao.short_description = "Conferido em (WF)"
+
+    def wf_observacao(self, obj):
+        despesa = self._get_despesa(obj)
+        if despesa and despesa.observacoes:
+            return despesa.observacoes
+        return '—'
+    wf_observacao.short_description = "Observação (WF)"
 
 
 class SaldoSupervisorAdmin(admin.ModelAdmin):
     change_form_template = 'admin/financeiro/saldosupervisor/change_form.html'
-    list_display = ('numero', 'nome_supervisor', 'data_inicio', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display', 'status')
+    change_list_template = 'admin/financeiro/saldosupervisor/change_list.html'
+    list_display = ('numero', 'nome_supervisor', 'data_inicio', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display', 'status_display')
     list_filter = ('status',)
     readonly_fields = ('numero', 'supervisor', 'saldo_disponivel', 'data_inicio', 'status', 'fechado_por', 'data_fechamento', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display')
     fields = ('numero', 'supervisor', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display', 'data_inicio', 'status', 'fechado_por', 'data_fechamento')
@@ -682,19 +745,40 @@ class SaldoSupervisorAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-    def response_change(self, request, obj):
-        if '_fechar_ciclo_btn' in request.POST and obj.status == 'ABERTO':
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        numero = request.GET.get('ss_numero', '').strip()
+        supervisor = request.GET.get('ss_supervisor', '').strip()
+        inicio_de = request.GET.get('ss_inicio_de', '').strip()
+        inicio_ate = request.GET.get('ss_inicio_ate', '').strip()
+        status = request.GET.get('ss_status', '').strip()
+        if numero:
+            qs = qs.filter(numero__icontains=numero)
+        if supervisor:
+            qs = qs.filter(supervisor__first_name__icontains=supervisor)
+        if inicio_de:
+            qs = qs.filter(data_inicio__gte=inicio_de)
+        if inicio_ate:
+            qs = qs.filter(data_inicio__lte=inicio_ate)
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        if request.method == 'POST' and '_fechar_ciclo_btn' in request.POST and object_id:
             from django.utils import timezone as tz
-            obj.status = 'FECHADO'
-            obj.fechado_por = request.user
-            obj.data_fechamento = tz.now()
-            obj.observacao_fechamento = request.POST.get('observacao_fechamento', '').strip()
-            obj.save()
-            self.message_user(request, f"Ciclo {obj.numero} fechado com sucesso.")
             from django.http import HttpResponseRedirect
             from django.urls import reverse
-            return HttpResponseRedirect(reverse('admin:financeiro_saldosupervisor_changelist'))
-        return super().response_change(request, obj)
+            obj = self.get_object(request, object_id)
+            if obj and obj.status == 'ABERTO':
+                obj.status = 'FECHADO'
+                obj.fechado_por = request.user
+                obj.data_fechamento = tz.now()
+                obj.observacao_fechamento = request.POST.get('observacao_fechamento', '').strip()
+                obj.save()
+                self.message_user(request, f"Ciclo {obj.numero} fechado com sucesso.")
+                return HttpResponseRedirect(reverse('admin:financeiro_saldosupervisor_changelist'))
+        return super().changeform_view(request, object_id, form_url, extra_context)
 
     def fechar_ciclo(self, request, queryset):
         from django.utils import timezone as tz
@@ -707,6 +791,13 @@ class SaldoSupervisorAdmin(admin.ModelAdmin):
             fechados += 1
         self.message_user(request, f"{fechados} linha(s) fechada(s) com sucesso.")
     fechar_ciclo.short_description = "Fechar ciclo selecionado"
+
+    def status_display(self, obj):
+        if obj.status == 'ABERTO':
+            return format_html('<span style="background:#f1c40f;color:#000;padding:3px 10px;border-radius:4px;font-weight:bold;">Aberto</span>')
+        return format_html('<span style="background:#27ae60;color:#fff;padding:3px 10px;border-radius:4px;font-weight:bold;">Fechado</span>')
+    status_display.short_description = "Status"
+    status_display.admin_order_field = 'status'
 
     def nome_supervisor(self, obj):
         nome = obj.supervisor.first_name.strip() if obj.supervisor.first_name else ''
