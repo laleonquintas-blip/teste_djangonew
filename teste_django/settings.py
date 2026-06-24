@@ -172,6 +172,13 @@ JAZZMIN_SETTINGS = {
                 "permissions": ["financeiro.view_contasapagar"]
             },
             {
+                "name": "Fluxo de Caixa",
+                "url": "/admin/financeiro/fluxo-de-caixa/",
+                "icon": "fas fa-stream",
+                "new_window": False,
+                "permissions": ["financeiro.view_contasareceber"]
+            },
+            {
                 "name": "Ajuste de Saldos",
                 "url": "/admin/financeiro/ajustar-saldos/",
                 "icon": "fas fa-sliders-h",

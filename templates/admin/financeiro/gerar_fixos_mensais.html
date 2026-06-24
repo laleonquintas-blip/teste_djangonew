@@ -105,6 +105,12 @@
             return;
         }
 
+        let anoInt = parseInt(ano);
+        if(isNaN(anoInt) || anoInt < 2000 || anoInt > 2100 || ano.length !== 4) {
+            alert('Ano inválido. Informe um ano com 4 dígitos (ex: 2026).');
+            return;
+        }
+
         if(mes.length === 1) mes = '0' + mes;
 
         let rows = document.querySelectorAll('tbody tr');

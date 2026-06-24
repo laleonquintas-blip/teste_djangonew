@@ -121,6 +121,7 @@ class GerarFixoAdmin(admin.ModelAdmin):
             clientes_ids = request.POST.getlist('clientes_selecionados')
             contas_geradas = 0
 
+            erros = []
             for cliente_id in clientes_ids:
                 data_vencimento = request.POST.get(f'data_gerar_{cliente_id}')
                 empresa_id = request.POST.get(f'empresa_id_{cliente_id}')
@@ -128,22 +129,33 @@ class GerarFixoAdmin(admin.ModelAdmin):
 
                 if data_vencimento and empresa_id and banco_id:
                     cliente_obj = Cliente.objects.get(id=cliente_id)
+
+                    if not cliente_obj.valor_contrato:
+                        erros.append(f"{cliente_obj.razao_social}: sem Valor do Contrato cadastrado.")
+                        continue
+
                     empresa_selecionada = Empresa.objects.get(id=empresa_id)
                     banco_selecionado = Banco.objects.get(id=banco_id)
 
-                    ContasAReceber.objects.create(
-                        cliente=cliente_obj,
-                        empresa_prestadora=empresa_selecionada,
-                        banco=banco_selecionado,
-                        data_emissao=date.today(),
-                        vencimento=data_vencimento,
-                        valor=cliente_obj.valor_contrato,
-                        status='PENDENTE',
-                        observacoes='Gerado automaticamente via lote de Fixos Mensais.'
-                    )
-                    contas_geradas += 1
+                    try:
+                        ContasAReceber.objects.create(
+                            cliente=cliente_obj,
+                            empresa_prestadora=empresa_selecionada,
+                            banco=banco_selecionado,
+                            data_emissao=date.today(),
+                            vencimento=data_vencimento,
+                            valor=cliente_obj.valor_contrato,
+                            status='PENDENTE',
+                            observacoes='Gerado automaticamente via lote de Fixos Mensais.'
+                        )
+                        contas_geradas += 1
+                    except Exception as e:
+                        erros.append(f"{cliente_obj.razao_social}: erro ao gerar ({e})")
 
-            self.message_user(request, f"Sucesso! {contas_geradas} Contas a Receber geradas.", messages.SUCCESS)
+            if contas_geradas:
+                self.message_user(request, f"Sucesso! {contas_geradas} Contas a Receber geradas.", messages.SUCCESS)
+            for erro in erros:
+                self.message_user(request, f"Ignorado — {erro}", messages.WARNING)
             return redirect(request.path)
 
         context = {

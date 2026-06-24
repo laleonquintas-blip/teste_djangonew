@@ -15,6 +15,129 @@ from financeiro.models import ContasAPagar, ContasAReceber, Transferencia
 
 
 @staff_member_required
+@permission_required('financeiro.view_contasareceber', raise_exception=True)
+def fluxo_de_caixa(request):
+    from collections import defaultdict
+    from cadastros.models import PlanoDeContas
+
+    hoje = date.today()
+    ano  = int(request.GET.get('ano', hoje.year))
+
+    status_filtro   = request.GET.get('status', 'TODOS')
+    filtro_cliente  = request.GET.get('cliente', '')
+    filtro_plano    = request.GET.get('plano', '')
+
+    meses = list(range(1, 13))
+    MESES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+
+    def fmt(val):
+        if not val:
+            return ''
+        return '{:,.2f}'.format(float(val)).replace(',','X').replace('.',',').replace('X','.')
+
+    # ── ENTRADAS ──────────────────────────────────────────────
+    cr_qs = ContasAReceber.objects.filter(vencimento__year=ano)
+    if status_filtro != 'TODOS':
+        cr_qs = cr_qs.filter(status=status_filtro)
+    if filtro_cliente:
+        cr_qs = cr_qs.filter(cliente__id=filtro_cliente)
+
+    # pivot: {cliente_nome: {mes: {'total': X, 'itens': [...]}}}
+    entradas_pivot = defaultdict(lambda: defaultdict(lambda: {'total': Decimal('0'), 'itens': []}))
+    for row in cr_qs.select_related('cliente'):
+        nome = row.cliente.razao_social if row.cliente else '—'
+        mes  = row.vencimento.month
+        entradas_pivot[nome][mes]['total'] += row.valor or Decimal('0')
+        entradas_pivot[nome][mes]['itens'].append({
+            'descricao':  row.observacoes or str(row.cliente),
+            'valor':      row.valor,
+            'vencimento': row.vencimento,
+            'status':     row.get_status_display(),
+        })
+
+    entradas_rows = []
+    for nome, meses_vals in entradas_pivot.items():
+        totais    = [meses_vals[m]['total'] if m in meses_vals else Decimal('0') for m in meses]
+        itens_mes = [meses_vals[m]['itens'] if m in meses_vals else [] for m in meses]
+        total     = sum(totais)
+        entradas_rows.append({'nome': nome, 'meses': totais, 'itens_mes': itens_mes, 'total': total})
+    entradas_rows.sort(key=lambda r: r['total'], reverse=True)
+
+    totais_entradas_mes = [
+        sum(r['meses'][i] for r in entradas_rows) for i in range(12)
+    ]
+    total_entradas = sum(totais_entradas_mes)
+
+    # ── DESPESAS ──────────────────────────────────────────────
+    cp_qs = ContasAPagar.objects.filter(vencimento__year=ano)
+    if status_filtro != 'TODOS':
+        cp_qs = cp_qs.filter(status=status_filtro)
+    if filtro_plano:
+        cp_qs = cp_qs.filter(plano_de_contas__id=filtro_plano)
+
+    # pivot: {plano_nome: {mes: {'total': X, 'itens': [...]}}}
+    despesas_pivot = defaultdict(lambda: defaultdict(lambda: {'total': Decimal('0'), 'itens': []}))
+    for row in cp_qs.select_related('plano_de_contas', 'fornecedor'):
+        plano = row.plano_de_contas.nome if row.plano_de_contas else 'Sem Plano de Contas'
+        mes   = row.vencimento.month
+        despesas_pivot[plano][mes]['total'] += row.valor or Decimal('0')
+        despesas_pivot[plano][mes]['itens'].append({
+            'nota':       row.nota,
+            'descricao':  row.observacoes or str(row.fornecedor),
+            'valor':      row.valor,
+            'vencimento': row.vencimento,
+            'status':     row.get_status_display(),
+        })
+
+    despesas_rows = []
+    for plano, meses_vals in despesas_pivot.items():
+        totais = [meses_vals[m]['total'] if m in meses_vals else Decimal('0') for m in meses]
+        itens_mes = [meses_vals[m]['itens'] if m in meses_vals else [] for m in meses]
+        total = sum(totais)
+        despesas_rows.append({
+            'plano': plano,
+            'meses': totais,
+            'itens_mes': itens_mes,
+            'total': total,
+        })
+    despesas_rows.sort(key=lambda r: r['total'], reverse=True)
+
+    totais_despesas_mes = [
+        sum(r['meses'][i] for r in despesas_rows) for i in range(12)
+    ]
+    total_despesas = sum(totais_despesas_mes)
+
+    saldo_mes = [totais_entradas_mes[i] - totais_despesas_mes[i] for i in range(12)]
+    saldo_total = total_entradas - total_despesas
+
+    # listas para os selects de filtro
+    todos_clientes = Cliente.objects.filter(ativo=True).order_by('razao_social')
+    todos_planos   = PlanoDeContas.objects.order_by('nome')
+
+    context = {
+        **admin.site.each_context(request),
+        'title': 'Fluxo de Caixa',
+        'ano': ano,
+        'meses_labels': MESES_PT,
+        'status_filtro': status_filtro,
+        'filtro_cliente': filtro_cliente,
+        'filtro_plano': filtro_plano,
+        'entradas_rows': entradas_rows,
+        'totais_entradas_mes': totais_entradas_mes,
+        'total_entradas': total_entradas,
+        'despesas_rows': despesas_rows,
+        'totais_despesas_mes': totais_despesas_mes,
+        'total_despesas': total_despesas,
+        'saldo_mes': saldo_mes,
+        'saldo_total': saldo_total,
+        'todos_clientes': todos_clientes,
+        'todos_planos': todos_planos,
+        'fmt': fmt,
+    }
+    return render(request, 'admin/financeiro/fluxo_de_caixa.html', context)
+
+
+@staff_member_required
 def get_fornecedor_info(request):
     fornecedor_id = request.GET.get('id')
     try:
@@ -58,15 +181,20 @@ def dashboard_financeiro(request):
             banco=banco, status='PAGO', data_baixa__lte=data_referencia
         ).aggregate(total=Sum('valor'))['total'] or 0
 
+        # Transferências devolvidas dentro do período não devem contar (efeito líquido = zero)
         transferencias_entrada = Transferencia.objects.filter(
             banco_destino=banco,
             data__lte=data_referencia
-        ).exclude(status='CANCELADA').aggregate(total=Sum('valor'))['total'] or 0
+        ).exclude(status='CANCELADA').exclude(
+            status='TEMP_DEVOLVIDA', data_devolucao__lte=data_referencia
+        ).aggregate(total=Sum('valor'))['total'] or 0
 
         transferencias_saida = Transferencia.objects.filter(
             banco_origem=banco,
             data__lte=data_referencia
-        ).exclude(status='CANCELADA').aggregate(total=Sum('valor'))['total'] or 0
+        ).exclude(status='CANCELADA').exclude(
+            status='TEMP_DEVOLVIDA', data_devolucao__lte=data_referencia
+        ).aggregate(total=Sum('valor'))['total'] or 0
 
         saldo_inicial = getattr(banco, 'saldo_inicial', 0) or 0
         saldo = saldo_inicial + total_entradas - total_saidas + transferencias_entrada - transferencias_saida

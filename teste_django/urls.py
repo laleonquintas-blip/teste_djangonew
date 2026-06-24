@@ -3,7 +3,7 @@ URL configuration for teste_django project.
 """
 from django.contrib import admin
 from django.urls import path
-from financeiro.views import get_fornecedor_info, dashboard_financeiro, gerar_fixos_mensais, ajustar_saldos_bancos
+from financeiro.views import get_fornecedor_info, dashboard_financeiro, gerar_fixos_mensais, ajustar_saldos_bancos, fluxo_de_caixa
 from extras.views import cloudinary_usage_api, cloudinary_storage_page
 from core.views import trocar_senha_obrigatoria
 
@@ -18,6 +18,7 @@ urlpatterns = [
     path('admin/financeiro/dashboard-gerencial/', dashboard_financeiro, name='dashboard_gerencial'),
     path('admin/financeiro/gerar-fixos/', gerar_fixos_mensais, name='gerar_fixos_mensais'),
     path('admin/financeiro/ajustar-saldos/', ajustar_saldos_bancos, name='ajustar_saldos'),
+    path('admin/financeiro/fluxo-de-caixa/', fluxo_de_caixa, name='fluxo_de_caixa'),
     path('admin/api/cloudinary-usage/', cloudinary_usage_api, name='api_cloudinary_usage'),
     path('admin/workflow/cloudinary-storage/', cloudinary_storage_page, name='cloudinary_storage_page'),
 

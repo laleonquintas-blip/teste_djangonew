@@ -78,6 +78,16 @@ class TomadorAdmin(ImportExportModelAdmin):
 class ClienteAdmin(admin.ModelAdmin):
     list_display = ('id', 'razao_social', 'cnpj_cpf', 'tipo', 'valor_contrato', 'data_cadastro')
     search_fields = ('razao_social', 'cnpj_cpf')
+    fields = (
+        'tipo',
+        'razao_social', 'cnpj_cpf',
+        'dia_vencimento', 'valor_contrato',
+        'descricao_atividade', 'forma_recebimento',
+        'ativo',
+    )
+
+    class Media:
+        js = ('admin/js/jquery.init.js', 'js/admin_cliente_tipo.js',)
 
 
 class PlanoDeContasAdmin(admin.ModelAdmin):

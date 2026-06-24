@@ -99,11 +99,11 @@ class Cliente(models.Model):
 
     # Dados Básicos
     razao_social = models.CharField(max_length=200, verbose_name="Razão Social")
-    cnpj_cpf = models.CharField(max_length=20, unique=True, verbose_name="CNPJ ou CPF")
+    cnpj_cpf = models.CharField(max_length=20, blank=True, verbose_name="CNPJ ou CPF")
 
     # Contrato
-    dia_vencimento = models.IntegerField(verbose_name="Dia de Vencimento (01-31)")
-    valor_contrato = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor do Contrato")
+    dia_vencimento = models.IntegerField(null=True, blank=True, verbose_name="Dia de Vencimento (01-31)")
+    valor_contrato = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Valor do Contrato")
     descricao_atividade = models.TextField(verbose_name="Descrição da Atividade", blank=True)
     forma_recebimento = models.CharField(max_length=100, verbose_name="Forma de Recebimento")
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='EVENTUAL')
