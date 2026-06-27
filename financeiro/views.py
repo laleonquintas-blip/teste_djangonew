@@ -26,6 +26,7 @@ def fluxo_de_caixa(request):
     status_filtro   = request.GET.get('status', 'TODOS')
     filtro_cliente  = request.GET.get('cliente', '')
     filtro_plano    = request.GET.get('plano', '')
+    filtro_filial   = request.GET.get('filial', '')
 
     meses = list(range(1, 13))
     MESES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
@@ -74,14 +75,44 @@ def fluxo_de_caixa(request):
         cp_qs = cp_qs.filter(status=status_filtro)
     if filtro_plano:
         cp_qs = cp_qs.filter(plano_de_contas__id=filtro_plano)
+    # Pré-carrega mapa nota→filial para todas as despesas WF do ano de uma vez
+    from workflow.models import Despesa as WFDespesa
+    wf_ids_no_ano = [
+        int(n.split('-')[1])
+        for n in cp_qs.filter(nota__startswith='WF-').values_list('nota', flat=True)
+        if n and n.startswith('WF-') and n.split('-')[1].isdigit()
+    ]
+    wf_filial_map = {
+        str(d.pk): d.filial.nome if d.filial else 'Sem Filial'
+        for d in WFDespesa.objects.filter(pk__in=wf_ids_no_ano).select_related('filial')
+    }
 
-    # pivot: {plano_nome: {mes: {'total': X, 'itens': [...]}}}
-    despesas_pivot = defaultdict(lambda: defaultdict(lambda: {'total': Decimal('0'), 'itens': []}))
+    if filtro_filial:
+        from cadastros.models import Filial
+        filial_obj = Filial.objects.filter(pk=filtro_filial).first()
+        filial_nome_filtro = filial_obj.nome if filial_obj else None
+        notas_wf_da_filial = [
+            f'WF-{wf_id}' for wf_id, nome in wf_filial_map.items() if nome == filial_nome_filtro
+        ]
+        cp_qs = cp_qs.filter(nota__in=notas_wf_da_filial)
+
+    # pivot: {plano: {filial: {mes: {'total': X, 'itens': [...]}}}}
+    despesas_pivot = defaultdict(
+        lambda: defaultdict(
+            lambda: defaultdict(lambda: {'total': Decimal('0'), 'itens': []})
+        )
+    )
     for row in cp_qs.select_related('plano_de_contas', 'fornecedor'):
         plano = row.plano_de_contas.nome if row.plano_de_contas else 'Sem Plano de Contas'
         mes   = row.vencimento.month
-        despesas_pivot[plano][mes]['total'] += row.valor or Decimal('0')
-        despesas_pivot[plano][mes]['itens'].append({
+
+        filial_nome = 'Sem Filial'
+        if row.nota and row.nota.startswith('WF-'):
+            wf_id_str = row.nota.split('-')[1]
+            filial_nome = wf_filial_map.get(wf_id_str, 'Sem Filial')
+
+        despesas_pivot[plano][filial_nome][mes]['total'] += row.valor or Decimal('0')
+        despesas_pivot[plano][filial_nome][mes]['itens'].append({
             'nota':       row.nota,
             'descricao':  row.observacoes or str(row.fornecedor),
             'valor':      row.valor,
@@ -90,15 +121,28 @@ def fluxo_de_caixa(request):
         })
 
     despesas_rows = []
-    for plano, meses_vals in despesas_pivot.items():
-        totais = [meses_vals[m]['total'] if m in meses_vals else Decimal('0') for m in meses]
-        itens_mes = [meses_vals[m]['itens'] if m in meses_vals else [] for m in meses]
-        total = sum(totais)
+    for plano, filiais_vals in despesas_pivot.items():
+        filiais_rows = []
+        plano_totais = [Decimal('0')] * 12
+        for filial_nome, meses_vals in filiais_vals.items():
+            totais_f = [meses_vals[m]['total'] if m in meses_vals else Decimal('0') for m in meses]
+            itens_mes_f = [meses_vals[m]['itens'] if m in meses_vals else [] for m in meses]
+            total_f = sum(totais_f)
+            filiais_rows.append({
+                'nome': filial_nome,
+                'meses': totais_f,
+                'itens_mes': itens_mes_f,
+                'total': total_f,
+            })
+            for i, v in enumerate(totais_f):
+                plano_totais[i] += v
+        filiais_rows.sort(key=lambda r: r['total'], reverse=True)
+        total_plano = sum(plano_totais)
         despesas_rows.append({
             'plano': plano,
-            'meses': totais,
-            'itens_mes': itens_mes,
-            'total': total,
+            'meses': plano_totais,
+            'filiais': filiais_rows,
+            'total': total_plano,
         })
     despesas_rows.sort(key=lambda r: r['total'], reverse=True)
 
@@ -111,8 +155,10 @@ def fluxo_de_caixa(request):
     saldo_total = total_entradas - total_despesas
 
     # listas para os selects de filtro
+    from cadastros.models import Filial
     todos_clientes = Cliente.objects.filter(ativo=True).order_by('razao_social')
     todos_planos   = PlanoDeContas.objects.order_by('nome')
+    todas_filiais  = Filial.objects.order_by('nome')
 
     context = {
         **admin.site.each_context(request),
@@ -122,6 +168,8 @@ def fluxo_de_caixa(request):
         'status_filtro': status_filtro,
         'filtro_cliente': filtro_cliente,
         'filtro_plano': filtro_plano,
+        'filtro_filial': filtro_filial,
+        'todas_filiais': todas_filiais,
         'entradas_rows': entradas_rows,
         'totais_entradas_mes': totais_entradas_mes,
         'total_entradas': total_entradas,

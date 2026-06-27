@@ -22,12 +22,15 @@
 .fc-table td { text-align: right; }
 .fc-table td:first-child { text-align: left; }
 
-.row-section { background: #2c3e50; color: #fff; font-weight: 700; font-size: 0.88rem; }
-.row-group   { background: #f2f4f6; font-weight: 700; cursor: pointer; }
+.row-section  { background: #2c3e50; color: #fff; font-weight: 700; font-size: 0.88rem; }
+.row-group    { background: #f2f4f6; font-weight: 700; cursor: pointer; }
 .row-group:hover { background: #e2e6ea; }
 .row-group td:first-child { padding-left: 12px; }
-.row-item    { background: #fff; font-size: 0.78rem; }
-.row-item td:first-child { padding-left: 34px; color: #555; }
+.row-subgroup { background: #eaf2ff; font-weight: 600; cursor: pointer; font-size: 0.80rem; }
+.row-subgroup:hover { background: #d6e8ff; }
+.row-subgroup td:first-child { padding-left: 28px; color: #2255aa; }
+.row-item     { background: #fff; font-size: 0.78rem; }
+.row-item td:first-child { padding-left: 50px; color: #555; }
 
 .row-total-e { background: #2e7d5e; color: #fff; font-weight: 700; }
 .row-total-d { background: #a93226; color: #fff; font-weight: 700; }
@@ -78,6 +81,15 @@
             <option value="">Todos</option>
             {% for p in todos_planos %}
             <option value="{{ p.id }}" {% if filtro_plano == p.id|stringformat:"s" %}selected{% endif %}>{{ p.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="mr-1 font-weight-bold">Filial</label>
+          <select name="filial" class="form-control form-control-sm">
+            <option value="">Todas</option>
+            {% for f in todas_filiais %}
+            <option value="{{ f.id }}" {% if filtro_filial == f.id|stringformat:"s" %}selected{% endif %}>{{ f.nome }}</option>
             {% endfor %}
           </select>
         </div>
@@ -160,7 +172,7 @@
 
             {% for row in despesas_rows %}
             {% with did=forloop.counter %}
-            <tr class="row-group secao-desp" onclick="toggle('desp','{{ did }}')">
+            <tr class="row-group secao-desp" onclick="toggleGroup('desp','{{ did }}')">
               <td>
                 <i class="fas fa-chevron-right ico" id="ico-desp-{{ did }}"></i>
                 {{ row.plano }}
@@ -171,9 +183,23 @@
               <td class="val-d"><strong>{{ row.total|fmt_brl }}</strong></td>
             </tr>
 
-            {% for itens in row.itens_mes %}
+            {% for filial in row.filiais %}
+            {% with fid=forloop.counter %}
+            <tr class="row-subgroup desp-{{ did }}" style="display:none;" onclick="toggleFilial('desp','{{ did }}','{{ fid }}'); event.stopPropagation();">
+              <td>
+                <i class="fas fa-map-marker-alt mr-1"></i>
+                <i class="fas fa-chevron-right ico" id="ico-desp-{{ did }}-{{ fid }}"></i>
+                {{ filial.nome }}
+              </td>
+              {% for v in filial.meses %}
+              <td class="{% if v %}val-d{% else %}val-z{% endif %}">{{ v|fmt_brl }}</td>
+              {% endfor %}
+              <td class="val-d"><strong>{{ filial.total|fmt_brl }}</strong></td>
+            </tr>
+
+            {% for itens in filial.itens_mes %}
             {% for item in itens %}
-            <tr class="row-item desp-{{ did }}" style="display:none;">
+            <tr class="row-item desp-{{ did }}-{{ fid }}" style="display:none;">
               <td>
                 <i class="fas fa-receipt mr-1 text-muted"></i>
                 <small>{{ meses_labels|index:forloop.parentloop.counter0 }} — {{ item.descricao|truncatechars:50 }}</small>
@@ -188,6 +214,9 @@
               <td class="val-d">{{ item.valor|fmt_brl }}</td>
             </tr>
             {% endfor %}
+            {% endfor %}
+
+            {% endwith %}
             {% endfor %}
 
             {% endwith %}
@@ -217,17 +246,46 @@
 </div>
 
 <script>
-function toggle(prefix, id) {
-    var rows = document.querySelectorAll('.' + prefix + '-' + id);
-    var ico  = document.getElementById('ico-' + prefix + '-' + id);
+function toggleSection(cls, icoId) {
+    var rows = document.querySelectorAll('.' + cls);
+    var ico  = document.getElementById(icoId);
     var opening = rows.length > 0 && rows[0].style.display === 'none';
     rows.forEach(function(r) { r.style.display = opening ? '' : 'none'; });
     if (ico) ico.classList.toggle('open', opening);
 }
 
-function toggleSection(cls, icoId) {
+// Abre/fecha as filiais (subgrupos) de um plano de contas
+function toggleGroup(prefix, did) {
+    var subgroups = document.querySelectorAll('.' + prefix + '-' + did);
+    var ico = document.getElementById('ico-' + prefix + '-' + did);
+    var opening = subgroups.length > 0 && subgroups[0].style.display === 'none';
+    subgroups.forEach(function(r) { r.style.display = opening ? '' : 'none'; });
+    if (ico) ico.classList.toggle('open', opening);
+    // Ao fechar o plano, esconde também os itens das filiais abertas
+    if (!opening) {
+        var items = document.querySelectorAll('[class*="' + prefix + '-' + did + '-"]');
+        items.forEach(function(r) { r.style.display = 'none'; });
+        // Reseta ícones das filiais
+        document.querySelectorAll('[id^="ico-' + prefix + '-' + did + '-"]').forEach(function(i) {
+            i.classList.remove('open');
+        });
+    }
+}
+
+// Abre/fecha os itens de uma filial
+function toggleFilial(prefix, did, fid) {
+    var cls = prefix + '-' + did + '-' + fid;
     var rows = document.querySelectorAll('.' + cls);
-    var ico  = document.getElementById(icoId);
+    var ico  = document.getElementById('ico-' + prefix + '-' + did + '-' + fid);
+    var opening = rows.length > 0 && rows[0].style.display === 'none';
+    rows.forEach(function(r) { r.style.display = opening ? '' : 'none'; });
+    if (ico) ico.classList.toggle('open', opening);
+}
+
+// Entradas (mantém comportamento original — sem subgrupo)
+function toggle(prefix, id) {
+    var rows = document.querySelectorAll('.' + prefix + '-' + id);
+    var ico  = document.getElementById('ico-' + prefix + '-' + id);
     var opening = rows.length > 0 && rows[0].style.display === 'none';
     rows.forEach(function(r) { r.style.display = opening ? '' : 'none'; });
     if (ico) ico.classList.toggle('open', opening);

@@ -75,6 +75,16 @@
             </div>
         </div>
 
+        <div class="cfb-field" style="min-width:160px;">
+            <label>Filial</label>
+            <select id="cfb_filial" data-cfb-param="filial_q">
+                <option value="">— Todas —</option>
+                {% for fid, fnome in filiais_opts %}
+                <option value="{{ fid }}">{{ fnome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
         <div class="cfb-field" style="min-width:140px;">
             <label>Tipo</label>
             <select id="cfb_tipo" data-cfb-param="tipo_lancamento">
@@ -101,6 +111,7 @@
             id_q:    cfbVal('cfb_id'),
             sol_q:   cfbVal('cfb_sol'),
             desp_q:  cfbVal('cfb_desp'),
+            filial_q: cfbVal('cfb_filial'),
             'data_criacao__range__gte': cfbVal('cfb_data_ini'),
             'data_criacao__range__lte': cfbVal('cfb_data_fim'),
             'data_ultima_alteracao__range__gte': cfbVal('cfb_alt_ini'),

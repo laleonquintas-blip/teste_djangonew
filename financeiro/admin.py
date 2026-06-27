@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.urls import path
 
 from .models import ContasAPagar, ContasAReceber, BaseSaldo, GerarFixo, Transferencia, SaldoSupervisor, MovimentacaoSupervisor
+from .resources import ContasAPagarResource, ContasAReceberResource
 from cadastros.models import Cliente
 from django.contrib.auth.models import Group
 from core.models import UsuarioCustomizado
@@ -191,6 +192,32 @@ class StatusFilter(admin.SimpleListFilter):
             return queryset.filter(status='PAGO')
         if self.value() == 'CANCELADO':
             return queryset.filter(status='CANCELADO')
+
+
+class BancoPagarFilter(admin.SimpleListFilter):
+    title = 'Banco'
+    parameter_name = 'banco_pagar'
+
+    def lookups(self, request, model_admin):
+        from cadastros.models import Banco
+        return list(Banco.objects.values_list('id', 'nome').order_by('nome'))
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(banco__id=self.value())
+
+
+class BancoReceberFilter(admin.SimpleListFilter):
+    title = 'Banco'
+    parameter_name = 'banco_receber'
+
+    def lookups(self, request, model_admin):
+        from cadastros.models import Banco
+        return list(Banco.objects.values_list('id', 'nome').order_by('nome'))
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(banco__id=self.value())
 
 
 class EmpresaPagadoraFilter(admin.SimpleListFilter):
@@ -375,6 +402,7 @@ class ContasAPagarForm(django_forms.ModelForm):
 
 
 class ContasAPagarAdmin(ImportExportModelAdmin):
+    resource_classes = [ContasAPagarResource]
     form = ContasAPagarForm
     list_display = ('nota', 'fornecedor', 'vencimento', 'valor', 'status_visual', 'responsavel_pagamento', 'data_baixa', 'usuario_baixa')
     search_fields = ('fornecedor__razao_social', 'nota', 'observacoes')
@@ -383,6 +411,7 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
         ('vencimento', DateRangeFilter),
         ('data_baixa', DateRangeFilter),
         EmpresaPagadoraFilter,
+        BancoPagarFilter,
         ResponsavelPagamentoFilter,
         NotaSearchFilter,
         FornecedorSearchFilter,
@@ -409,6 +438,7 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         from django.db.models import Sum
+        from cadastros.models import Banco
         extra = extra_context or {}
         extra['custom_filter_template'] = 'admin/financeiro/contasapagar/_filters.html'
         extra['empresas_opts'] = list(
@@ -416,6 +446,7 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
             .values_list('empresa_pagadora__id', 'empresa_pagadora__nome')
             .distinct().order_by('empresa_pagadora__nome')
         )
+        extra['bancos_opts'] = list(Banco.objects.values_list('id', 'nome').order_by('nome'))
         grupos_permitidos = Group.objects.filter(name__in=['Aprovador Financeiro', 'Operador'])
         usuarios = UsuarioCustomizado.objects.filter(
             groups__in=grupos_permitidos
@@ -444,6 +475,7 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
 
 # --- 2. CONTAS A RECEBER ---
 class ContasAReceberAdmin(ImportExportModelAdmin):
+    resource_classes = [ContasAReceberResource]
     list_display = ('nota', 'cliente', 'vencimento', 'valor', 'status_visual', 'data_baixa', 'usuario_baixa')
     search_fields = ('cliente__razao_social', 'nota', 'observacoes')
     list_filter = (
@@ -451,6 +483,7 @@ class ContasAReceberAdmin(ImportExportModelAdmin):
         ('vencimento', DateRangeFilter),
         ('data_baixa', DateRangeFilter),
         EmpresaPrestadoraFilter,
+        BancoReceberFilter,
         NotaSearchFilter,
         ClienteSearchFilter,
     )
@@ -461,6 +494,7 @@ class ContasAReceberAdmin(ImportExportModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         from django.db.models import Sum
+        from cadastros.models import Banco
         extra = extra_context or {}
         extra['custom_filter_template'] = 'admin/financeiro/contasareceber/_filters.html'
         extra['empresas_opts'] = list(
@@ -468,6 +502,7 @@ class ContasAReceberAdmin(ImportExportModelAdmin):
             .values_list('empresa_prestadora__id', 'empresa_prestadora__nome')
             .distinct().order_by('empresa_prestadora__nome')
         )
+        extra['bancos_opts'] = list(Banco.objects.values_list('id', 'nome').order_by('nome'))
         response = super().changelist_view(request, extra_context=extra)
         try:
             qs = response.context_data['cl'].queryset

@@ -56,6 +56,16 @@ class WfDespesaFilter(_WfTextFilter):
             return queryset.filter(fornecedor__razao_social__icontains=self.value())
 
 
+class WfFilialFilter(_WfTextFilter):
+    title = 'Filial'; parameter_name = 'filial_q'
+    def queryset(self, request, queryset):
+        if self.value():
+            try:
+                return queryset.filter(filial__id=int(self.value()))
+            except ValueError:
+                return queryset.none()
+
+
 # ---------------------------------------------------------------------------
 # Mapa de ações por perfil/status → escolhas amigáveis no select de status
 # ---------------------------------------------------------------------------
@@ -229,6 +239,17 @@ class DespesaForm(forms.ModelForm):
             if campo in self.fields:
                 self.fields[campo].required = False
 
+        # Injeta IDs para o JS auto-preencher colaborador_faltou quando motivo = Vagas em aberto
+        if 'motivo_ausencia' in self.fields:
+            try:
+                from cadastros.models import MotivoAusencia, Colaborador
+                motivo_vagas = MotivoAusencia.objects.get(nome__icontains='Vagas em aberto')
+                colab_freelance = Colaborador.objects.get(nome__iexact='FREE LANCE - VAGAS EM ABERTO')
+                self.fields['motivo_ausencia'].widget.attrs['data-vagas-motivo-id'] = motivo_vagas.id
+                self.fields['motivo_ausencia'].widget.attrs['data-vagas-colab-id'] = colab_freelance.id
+            except Exception:
+                pass
+
     def clean(self):
         cleaned_data = super().clean()
         tipo = cleaned_data.get('tipo_reserva')
@@ -240,11 +261,39 @@ class DespesaForm(forms.ModelForm):
         self.instance.tipo_lancamento = tipo
         cleaned_data['tipo_lancamento'] = tipo
 
+        # Regra: motivo "Vagas em aberto" → força colaborador_faltou = FREE LANCE - VAGAS EM ABERTO
+        motivo_obj = cleaned_data.get('motivo_ausencia')
+        if motivo_obj and 'vagas em aberto' in motivo_obj.nome.lower():
+            try:
+                from cadastros.models import Colaborador
+                colab_freelance = Colaborador.objects.get(nome__iexact='FREE LANCE - VAGAS EM ABERTO')
+                cleaned_data['colaborador_faltou'] = colab_freelance
+            except Exception:
+                pass
+
         if not self.instance.pk and self.request:
             cleaned_data['solicitante'] = self.request.user
             self.instance.solicitante = self.request.user
             if not cleaned_data.get('valor'):
                 self.add_error('valor', 'Este campo é obrigatório.')
+
+            if tipo == 'CAIXINHA':
+                if not cleaned_data.get('comprovante'):
+                    self.add_error('comprovante', 'É obrigatório anexar um comprovante.')
+
+            if tipo in ('SOLICITACAO', 'EXTRA'):
+                if not cleaned_data.get('tomador'):
+                    self.add_error('tomador', 'Este campo é obrigatório.')
+                if not cleaned_data.get('filial'):
+                    self.add_error('filial', 'Este campo é obrigatório.')
+                if not cleaned_data.get('motivo_ausencia'):
+                    self.add_error('motivo_ausencia', 'Este campo é obrigatório.')
+                if not cleaned_data.get('colaborador_faltou'):
+                    self.add_error('colaborador_faltou', 'Este campo é obrigatório.')
+                dias_cob = (cleaned_data.get('dias_cobertura') or '').strip()
+                datas_validas = [p.strip() for p in dias_cob.split(',') if p.strip()]
+                if not datas_validas:
+                    self.add_error('dias_cobertura', 'Selecione pelo menos uma data de cobertura.')
 
         if self.instance.pk:
             protegidos = [
@@ -411,11 +460,13 @@ class DespesaAdmin(admin.ModelAdmin):
     list_filter = (
         'tipo_lancamento',
         'status',
+        'filial',
         ('data_criacao', DateRangeFilterBuilder(title='Data da Solicitação')),
         ('data_ultima_alteracao', DateRangeFilterBuilder(title='Última Troca de Status')),
         WfIdFilter,
         WfSolicitanteFilter,
         WfDespesaFilter,
+        WfFilialFilter,
     )
     search_fields = ('id', 'fornecedor__razao_social', 'solicitante__first_name')
 
@@ -850,8 +901,10 @@ class DespesaAdmin(admin.ModelAdmin):
         )
 
     def changelist_view(self, request, extra_context=None):
+        from cadastros.models import Filial
         extra = extra_context or {}
         extra['status_choices'] = STATUS_WORKFLOW
+        extra['filiais_opts'] = list(Filial.objects.values_list('id', 'nome').order_by('nome'))
         extra['solicitantes_opts'] = list(
             UsuarioCustomizado.objects.filter(solicitacoes__isnull=False)
             .values_list('id', 'first_name', 'last_name').distinct().order_by('first_name')
