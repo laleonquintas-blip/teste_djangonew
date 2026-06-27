@@ -12,7 +12,9 @@
 
 {% block extrastyle %}{{ block.super }}
 <style>
-.sla-card { border-radius:10px; padding:18px 22px; color:#fff; display:flex; flex-direction:column; gap:4px; }
+.sla-card { border-radius:10px; padding:18px 22px; color:#fff; display:flex; flex-direction:column; gap:4px; cursor:pointer; text-decoration:none; transition:transform .15s, box-shadow .15s; }
+.sla-card:hover { transform:translateY(-3px); box-shadow:0 6px 20px rgba(0,0,0,.25); color:#fff; text-decoration:none; }
+.sla-card.active-filter { outline:4px solid rgba(255,255,255,.8); transform:translateY(-3px); box-shadow:0 6px 20px rgba(0,0,0,.3); }
 .sla-card .sla-num  { font-size:2.2rem; font-weight:800; line-height:1; }
 .sla-card .sla-pct  { font-size:0.85rem; opacity:.85; }
 .sla-card .sla-lbl  { font-size:0.78rem; text-transform:uppercase; letter-spacing:.05em; opacity:.8; margin-top:4px; }
@@ -52,48 +54,55 @@
 {% endif %}
 
 {# ── CARDS ── #}
+{% with base_qs=request.GET.urlencode %}
 <div class="row mb-3" style="gap:0;">
   <div class="col-sm-6 col-md mb-2 px-1">
-    <div class="sla-card card-no-prazo">
+    <a href="?tipo={{ filtro_tipo }}&status={{ filtro_status }}&data_de={{ filtro_de }}&data_ate={{ filtro_ate }}&sla={% if filtro_sla == 'NO_PRAZO' %}{% else %}NO_PRAZO{% endif %}"
+       class="sla-card card-no-prazo{% if filtro_sla == 'NO_PRAZO' %} active-filter{% endif %}">
       <span class="sla-lbl">🟢 No Prazo (abertos)</span>
       <span class="sla-num">{{ contadores.NO_PRAZO }}</span>
       <span class="sla-pct">{{ pct_no_prazo }}% do total</span>
       <div class="sla-bar"><div class="sla-bar-fill" style="width:{{ pct_no_prazo }}%;background:rgba(255,255,255,.4);"></div></div>
-    </div>
+    </a>
   </div>
   <div class="col-sm-6 col-md mb-2 px-1">
-    <div class="sla-card card-a-vencer">
+    <a href="?tipo={{ filtro_tipo }}&status={{ filtro_status }}&data_de={{ filtro_de }}&data_ate={{ filtro_ate }}&sla={% if filtro_sla == 'A_VENCER' %}{% else %}A_VENCER{% endif %}"
+       class="sla-card card-a-vencer{% if filtro_sla == 'A_VENCER' %} active-filter{% endif %}">
       <span class="sla-lbl">🟡 A Vencer (&gt;80% do prazo)</span>
       <span class="sla-num">{{ contadores.A_VENCER }}</span>
       <span class="sla-pct">{{ pct_a_vencer }}% do total</span>
       <div class="sla-bar"><div class="sla-bar-fill" style="width:{{ pct_a_vencer }}%;background:rgba(255,255,255,.4);"></div></div>
-    </div>
+    </a>
   </div>
   <div class="col-sm-6 col-md mb-2 px-1">
-    <div class="sla-card card-em-atraso">
+    <a href="?tipo={{ filtro_tipo }}&status={{ filtro_status }}&data_de={{ filtro_de }}&data_ate={{ filtro_ate }}&sla={% if filtro_sla == 'EM_ATRASO' %}{% else %}EM_ATRASO{% endif %}"
+       class="sla-card card-em-atraso{% if filtro_sla == 'EM_ATRASO' %} active-filter{% endif %}">
       <span class="sla-lbl">⚠️ Em Atraso (abertos)</span>
       <span class="sla-num">{{ contadores.EM_ATRASO }}</span>
       <span class="sla-pct">{{ pct_em_atraso }}% do total</span>
       <div class="sla-bar"><div class="sla-bar-fill" style="width:{{ pct_em_atraso }}%;background:rgba(255,255,255,.4);"></div></div>
-    </div>
+    </a>
   </div>
   <div class="col-sm-6 col-md mb-2 px-1">
-    <div class="sla-card card-fechado-ok">
+    <a href="?tipo={{ filtro_tipo }}&status={{ filtro_status }}&data_de={{ filtro_de }}&data_ate={{ filtro_ate }}&sla={% if filtro_sla == 'FECHADO_OK' %}{% else %}FECHADO_OK{% endif %}"
+       class="sla-card card-fechado-ok{% if filtro_sla == 'FECHADO_OK' %} active-filter{% endif %}">
       <span class="sla-lbl">✅ Fechados no Prazo</span>
       <span class="sla-num">{{ contadores.FECHADO_OK }}</span>
       <span class="sla-pct">{{ pct_fechado_ok }}% do total</span>
       <div class="sla-bar"><div class="sla-bar-fill" style="width:{{ pct_fechado_ok }}%;background:rgba(255,255,255,.4);"></div></div>
-    </div>
+    </a>
   </div>
   <div class="col-sm-6 col-md mb-2 px-1">
-    <div class="sla-card card-fechado-atr">
+    <a href="?tipo={{ filtro_tipo }}&status={{ filtro_status }}&data_de={{ filtro_de }}&data_ate={{ filtro_ate }}&sla={% if filtro_sla == 'FECHADO_ATRASO' %}{% else %}FECHADO_ATRASO{% endif %}"
+       class="sla-card card-fechado-atr{% if filtro_sla == 'FECHADO_ATRASO' %} active-filter{% endif %}">
       <span class="sla-lbl">🔴 Fechados com Atraso</span>
       <span class="sla-num">{{ contadores.FECHADO_ATRASO }}</span>
       <span class="sla-pct">{{ pct_fechado_atraso }}% do total</span>
       <div class="sla-bar"><div class="sla-bar-fill" style="width:{{ pct_fechado_atraso }}%;background:rgba(255,255,255,.4);"></div></div>
-    </div>
+    </a>
   </div>
 </div>
+{% endwith %}
 
 {# ── FILTROS ── #}
 <div class="card card-outline card-primary mb-3">
