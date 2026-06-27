@@ -3,6 +3,7 @@ from collections import Counter
 from django.shortcuts import render
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Sum, F
+from django.utils import timezone as tz
 
 
 @staff_member_required
@@ -136,3 +137,139 @@ def relatorio_coberturas(request):
         'motivo_selecionado': motivo_selecionado,
     }
     return render(request, 'admin/workflow/relatorio_coberturas.html', context)
+
+
+@staff_member_required
+def painel_sla(request):
+    from .models import Despesa, ConfiguracaoSLA, LogWorkflow, STATUS_WORKFLOW
+    from django import contrib
+    import admin as django_admin
+
+    # Carrega configurações de SLA ativas
+    sla_map = {
+        s.status: s.prazo_horas
+        for s in ConfiguracaoSLA.objects.filter(ativo=True)
+    }
+
+    STATUS_FINAIS = {'PAGO', 'CONFERIDO', 'CANCELADO'}
+    STATUS_LABELS = dict(STATUS_WORKFLOW)
+
+    agora = tz.now()
+
+    # Filtros
+    filtro_tipo   = request.GET.get('tipo', '')
+    filtro_status = request.GET.get('status', '')
+    filtro_sla    = request.GET.get('sla', '')   # NO_PRAZO | A_VENCER | EM_ATRASO | FECHADO_ATRASO | FECHADO_OK
+    filtro_de     = request.GET.get('data_de', '')
+    filtro_ate    = request.GET.get('data_ate', '')
+
+    qs = Despesa.objects.select_related('solicitante', 'fornecedor', 'filial').prefetch_related('logs')
+    if filtro_tipo:
+        qs = qs.filter(tipo_lancamento=filtro_tipo)
+    if filtro_status:
+        qs = qs.filter(status=filtro_status)
+    if filtro_de:
+        qs = qs.filter(data_criacao__date__gte=filtro_de)
+    if filtro_ate:
+        qs = qs.filter(data_criacao__date__lte=filtro_ate)
+
+    resultados = []
+    contadores = {'NO_PRAZO': 0, 'A_VENCER': 0, 'EM_ATRASO': 0, 'FECHADO_ATRASO': 0, 'FECHADO_OK': 0}
+
+    for despesa in qs:
+        status_atual = despesa.status
+        is_final = status_atual in STATUS_FINAIS
+
+        if is_final:
+            # Tempo total de vida: criação → última alteração
+            if despesa.data_criacao and despesa.data_ultima_alteracao:
+                tempo_total_h = (despesa.data_ultima_alteracao - despesa.data_criacao).total_seconds() / 3600
+            else:
+                tempo_total_h = 0
+            soma_sla = sum(sla_map.values()) if sla_map else None
+            if soma_sla:
+                situacao = 'FECHADO_OK' if tempo_total_h <= soma_sla else 'FECHADO_ATRASO'
+            else:
+                situacao = 'FECHADO_OK'
+            tempo_display = tempo_total_h
+            prazo_ref = soma_sla
+            excesso_h = max(0, tempo_total_h - soma_sla) if soma_sla else 0
+        else:
+            # Tempo no status atual: última alteração → agora
+            prazo_h = sla_map.get(status_atual)
+            if despesa.data_ultima_alteracao:
+                tempo_no_status_h = (agora - despesa.data_ultima_alteracao).total_seconds() / 3600
+            else:
+                tempo_no_status_h = 0
+
+            tempo_display = tempo_no_status_h
+            prazo_ref = prazo_h
+            excesso_h = 0
+
+            if prazo_h is None:
+                situacao = 'NO_PRAZO'
+            elif tempo_no_status_h >= prazo_h:
+                situacao = 'EM_ATRASO'
+                excesso_h = tempo_no_status_h - prazo_h
+            elif tempo_no_status_h >= prazo_h * 0.8:
+                situacao = 'A_VENCER'
+            else:
+                situacao = 'NO_PRAZO'
+
+        contadores[situacao] += 1
+
+        if filtro_sla and situacao != filtro_sla:
+            continue
+
+        def fmt_horas(h):
+            if h is None:
+                return '—'
+            h = int(h)
+            d, hr = divmod(h, 24)
+            partes = []
+            if d: partes.append(f"{d}d")
+            if hr: partes.append(f"{hr}h")
+            return " ".join(partes) or "< 1h"
+
+        resultados.append({
+            'despesa': despesa,
+            'situacao': situacao,
+            'tempo_h': tempo_display,
+            'tempo_fmt': fmt_horas(tempo_display),
+            'prazo_h': prazo_ref,
+            'prazo_fmt': fmt_horas(prazo_ref),
+            'excesso_fmt': fmt_horas(excesso_h) if excesso_h else '',
+            'status_label': STATUS_LABELS.get(status_atual, status_atual),
+            'is_final': is_final,
+        })
+
+    # Ordena: em atraso primeiro, depois a vencer, etc.
+    ordem = {'EM_ATRASO': 0, 'FECHADO_ATRASO': 1, 'A_VENCER': 2, 'FECHADO_OK': 3, 'NO_PRAZO': 4}
+    resultados.sort(key=lambda r: (ordem.get(r['situacao'], 9), -(r['tempo_h'] or 0)))
+
+    total = sum(contadores.values())
+    pct = lambda v: round(v / total * 100) if total else 0
+
+    from django.contrib import admin as dj_admin
+    context = {
+        **dj_admin.site.each_context(request),
+        'title': 'Painel de SLA — Workflow',
+        'resultados': resultados,
+        'contadores': contadores,
+        'total': total,
+        'pct_no_prazo':       pct(contadores['NO_PRAZO']),
+        'pct_a_vencer':       pct(contadores['A_VENCER']),
+        'pct_em_atraso':      pct(contadores['EM_ATRASO']),
+        'pct_fechado_atraso': pct(contadores['FECHADO_ATRASO']),
+        'pct_fechado_ok':     pct(contadores['FECHADO_OK']),
+        'filtro_tipo':   filtro_tipo,
+        'filtro_status': filtro_status,
+        'filtro_sla':    filtro_sla,
+        'filtro_de':     filtro_de,
+        'filtro_ate':    filtro_ate,
+        'tipo_choices':   [('CAIXINHA','Caixinha'),('SOLICITACAO','Solicitação'),('EXTRA','Extra')],
+        'status_choices': [(s, l) for s, l in STATUS_WORKFLOW if s not in STATUS_FINAIS],
+        'sla_map': sla_map,
+        'sem_sla': not sla_map,
+    }
+    return render(request, 'admin/workflow/painel_sla.html', context)

@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'cadastros',
     'financeiro',
     'workflow',
+    'monitoramento_rh',
     'import_export',
     'rangefilter',
     'cloudinary_storage',
@@ -131,7 +132,7 @@ JAZZMIN_SETTINGS = {
     "navigation_expanded": False,
     "sidebar_nav_child_indent": True,
     "sidebar_nav_compact_style": True,
-    "order_with_respect_to": ["workflow", "financeiro", "cadastros", "core"],
+    "order_with_respect_to": ["workflow", "monitoramento_rh", "financeiro", "cadastros", "core"],
 
     "icons": {
         "auth": "fas fa-users-cog",
@@ -139,6 +140,7 @@ JAZZMIN_SETTINGS = {
         "auth.Group": "fas fa-users",
         "workflow": "fas fa-project-diagram",
         "workflow.Despesa": "fas fa-tasks",
+        "workflow.ConfiguracaoSLA": "fas fa-stopwatch",
         "financeiro": "fas fa-dollar-sign",
         "financeiro.ContasAPagar": "fas fa-money-bill-wave",
         "financeiro.ContasAReceber": "fas fa-hand-holding-usd",
@@ -150,11 +152,20 @@ JAZZMIN_SETTINGS = {
         "cadastros.Fornecedor": "fas fa-truck",
         "cadastros.PlanoDeContas": "fas fa-sitemap",
         "core": "fas fa-cog",
+        "monitoramento_rh": "fas fa-heartbeat",
+        "monitoramento_rh.coberturasrh": "fas fa-user-clock",
     },
 
     # 1. ADICIONA LINKS CUSTOMIZADOS NO MENU
     "custom_links": {
         "workflow": [
+            {
+                "name": "Painel de SLA",
+                "url": "/admin/workflow/painel-sla/",
+                "icon": "fas fa-tachometer-alt",
+                "new_window": False,
+                "permissions": ["workflow.view_despesa"]
+            },
             {
                 "name": "Armazenamento Cloudinary",
                 "url": "/admin/workflow/cloudinary-storage/",

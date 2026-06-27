@@ -1,0 +1,197 @@
+{% extends "admin/base_site.html" %}
+
+{% block content_title %}Painel de SLA — Workflow{% endblock %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{% url 'admin:index' %}">Início</a></li>
+  <li class="breadcrumb-item">Workflow</li>
+  <li class="breadcrumb-item active">Painel de SLA</li>
+</ol>
+{% endblock %}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+.sla-card { border-radius:10px; padding:18px 22px; color:#fff; display:flex; flex-direction:column; gap:4px; }
+.sla-card .sla-num  { font-size:2.2rem; font-weight:800; line-height:1; }
+.sla-card .sla-pct  { font-size:0.85rem; opacity:.85; }
+.sla-card .sla-lbl  { font-size:0.78rem; text-transform:uppercase; letter-spacing:.05em; opacity:.8; margin-top:4px; }
+.card-no-prazo      { background: linear-gradient(135deg,#27ae60,#1e8449); }
+.card-a-vencer      { background: linear-gradient(135deg,#f39c12,#d68910); }
+.card-em-atraso     { background: linear-gradient(135deg,#e74c3c,#c0392b); }
+.card-fechado-ok    { background: linear-gradient(135deg,#2980b9,#1a5276); }
+.card-fechado-atr   { background: linear-gradient(135deg,#8e44ad,#6c3483); }
+
+.sla-bar { height:8px; border-radius:4px; background:#e9ecef; overflow:hidden; margin-top:6px; }
+.sla-bar-fill { height:100%; border-radius:4px; transition:width .4s; }
+
+.badge-NO_PRAZO      { background:#27ae60; color:#fff; }
+.badge-A_VENCER      { background:#f39c12; color:#fff; }
+.badge-EM_ATRASO     { background:#e74c3c; color:#fff; }
+.badge-FECHADO_OK    { background:#2980b9; color:#fff; }
+.badge-FECHADO_ATRASO{ background:#8e44ad; color:#fff; }
+
+.sla-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; }
+.sla-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.sla-table th { background:#343a40; color:#fff; padding:8px 10px; text-align:left; white-space:nowrap; }
+.sla-table td { padding:7px 10px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+.sla-table tr:hover td { background:#f8f9fa; }
+.excesso { color:#e74c3c; font-weight:bold; font-size:.78rem; }
+.aviso-sem-sla { background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:12px 16px; margin-bottom:16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="col-12">
+
+{% if sem_sla %}
+<div class="aviso-sem-sla">
+  ⚠️ <strong>Nenhuma configuração de SLA ativa.</strong>
+  <a href="{% url 'admin:workflow_configuracaosla_changelist' %}" class="ml-2">Configurar agora →</a>
+</div>
+{% endif %}
+
+{# ── CARDS ── #}
+<div class="row mb-3" style="gap:0;">
+  <div class="col-sm-6 col-md mb-2 px-1">
+    <div class="sla-card card-no-prazo">
+      <span class="sla-lbl">🟢 No Prazo (abertos)</span>
+      <span class="sla-num">{{ contadores.NO_PRAZO }}</span>
+      <span class="sla-pct">{{ pct_no_prazo }}% do total</span>
+      <div class="sla-bar"><div class="sla-bar-fill" style="width:{{ pct_no_prazo }}%;background:rgba(255,255,255,.4);"></div></div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-md mb-2 px-1">
+    <div class="sla-card card-a-vencer">
+      <span class="sla-lbl">🟡 A Vencer (&gt;80% do prazo)</span>
+      <span class="sla-num">{{ contadores.A_VENCER }}</span>
+      <span class="sla-pct">{{ pct_a_vencer }}% do total</span>
+      <div class="sla-bar"><div class="sla-bar-fill" style="width:{{ pct_a_vencer }}%;background:rgba(255,255,255,.4);"></div></div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-md mb-2 px-1">
+    <div class="sla-card card-em-atraso">
+      <span class="sla-lbl">⚠️ Em Atraso (abertos)</span>
+      <span class="sla-num">{{ contadores.EM_ATRASO }}</span>
+      <span class="sla-pct">{{ pct_em_atraso }}% do total</span>
+      <div class="sla-bar"><div class="sla-bar-fill" style="width:{{ pct_em_atraso }}%;background:rgba(255,255,255,.4);"></div></div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-md mb-2 px-1">
+    <div class="sla-card card-fechado-ok">
+      <span class="sla-lbl">✅ Fechados no Prazo</span>
+      <span class="sla-num">{{ contadores.FECHADO_OK }}</span>
+      <span class="sla-pct">{{ pct_fechado_ok }}% do total</span>
+      <div class="sla-bar"><div class="sla-bar-fill" style="width:{{ pct_fechado_ok }}%;background:rgba(255,255,255,.4);"></div></div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-md mb-2 px-1">
+    <div class="sla-card card-fechado-atr">
+      <span class="sla-lbl">🔴 Fechados com Atraso</span>
+      <span class="sla-num">{{ contadores.FECHADO_ATRASO }}</span>
+      <span class="sla-pct">{{ pct_fechado_atraso }}% do total</span>
+      <div class="sla-bar"><div class="sla-bar-fill" style="width:{{ pct_fechado_atraso }}%;background:rgba(255,255,255,.4);"></div></div>
+    </div>
+  </div>
+</div>
+
+{# ── FILTROS ── #}
+<div class="card card-outline card-primary mb-3">
+  <div class="card-body py-2">
+    <form method="GET" class="form-inline flex-wrap" style="gap:8px;">
+      <select name="tipo" class="form-control form-control-sm">
+        <option value="">Todos os tipos</option>
+        {% for v,l in tipo_choices %}<option value="{{ v }}" {% if filtro_tipo == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+      <select name="status" class="form-control form-control-sm">
+        <option value="">Todos os status (abertos)</option>
+        {% for v,l in status_choices %}<option value="{{ v }}" {% if filtro_status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+      <select name="sla" class="form-control form-control-sm">
+        <option value="">Todas as situações SLA</option>
+        <option value="NO_PRAZO"       {% if filtro_sla == 'NO_PRAZO'       %}selected{% endif %}>🟢 No Prazo</option>
+        <option value="A_VENCER"       {% if filtro_sla == 'A_VENCER'       %}selected{% endif %}>🟡 A Vencer</option>
+        <option value="EM_ATRASO"      {% if filtro_sla == 'EM_ATRASO'      %}selected{% endif %}>⚠️ Em Atraso</option>
+        <option value="FECHADO_OK"     {% if filtro_sla == 'FECHADO_OK'     %}selected{% endif %}>✅ Fechado no Prazo</option>
+        <option value="FECHADO_ATRASO" {% if filtro_sla == 'FECHADO_ATRASO' %}selected{% endif %}>🔴 Fechado com Atraso</option>
+      </select>
+      <input type="date" name="data_de"  class="form-control form-control-sm" value="{{ filtro_de }}"  title="Data criação de">
+      <input type="date" name="data_ate" class="form-control form-control-sm" value="{{ filtro_ate }}" title="Data criação até">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search mr-1"></i>Filtrar</button>
+      <a href="?" class="btn btn-secondary btn-sm">Limpar</a>
+      <a href="{% url 'admin:workflow_configuracaosla_changelist' %}" class="btn btn-outline-dark btn-sm ml-auto">
+        <i class="fas fa-cog mr-1"></i>Configurar SLAs
+      </a>
+    </form>
+  </div>
+</div>
+
+{# ── TABELA ── #}
+<div class="card card-outline card-dark">
+  <div class="card-header py-2">
+    <strong>{{ resultados|length }} registro(s) exibido(s)</strong>
+    <span class="text-muted ml-2" style="font-size:.8rem;">Total na base: {{ total }}</span>
+  </div>
+  <div class="card-body p-0" style="overflow-x:auto;">
+    <table class="sla-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Tipo</th>
+          <th>Solicitante</th>
+          <th>Despesa / Fornecedor</th>
+          <th>Filial</th>
+          <th>Status Atual</th>
+          <th>Criado em</th>
+          <th>Tempo no Status</th>
+          <th>Prazo SLA</th>
+          <th>Excesso</th>
+          <th>Situação SLA</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in resultados %}
+      <tr>
+        <td><strong>#{{ r.despesa.id }}</strong></td>
+        <td>{{ r.despesa.get_tipo_lancamento_display }}</td>
+        <td>{{ r.despesa.solicitante.get_full_name|default:r.despesa.solicitante.username }}</td>
+        <td>{{ r.despesa.fornecedor.razao_social|truncatechars:35 }}</td>
+        <td>{{ r.despesa.filial.nome|default:"—" }}</td>
+        <td>{{ r.status_label }}</td>
+        <td style="white-space:nowrap;">
+          {% if r.despesa.data_criacao %}{{ r.despesa.data_criacao|date:"d/m/Y H:i" }}{% else %}—{% endif %}
+        </td>
+        <td style="white-space:nowrap;{% if r.situacao == 'EM_ATRASO' or r.situacao == 'FECHADO_ATRASO' %}color:#e74c3c;font-weight:bold;{% endif %}">
+          {{ r.tempo_fmt }}
+        </td>
+        <td style="white-space:nowrap;">{{ r.prazo_fmt }}</td>
+        <td>
+          {% if r.excesso_fmt %}
+          <span class="excesso">+{{ r.excesso_fmt }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          <span class="sla-badge badge-{{ r.situacao }}">
+            {% if r.situacao == 'NO_PRAZO'       %}🟢 No Prazo
+            {% elif r.situacao == 'A_VENCER'     %}🟡 A Vencer
+            {% elif r.situacao == 'EM_ATRASO'    %}⚠️ Em Atraso
+            {% elif r.situacao == 'FECHADO_OK'   %}✅ Fechado OK
+            {% elif r.situacao == 'FECHADO_ATRASO' %}🔴 Fechado c/ Atraso
+            {% endif %}
+          </span>
+        </td>
+        <td>
+          <a href="{% url 'admin:workflow_despesa_change' r.despesa.id %}" class="btn btn-xs btn-outline-secondary" style="padding:2px 8px;font-size:.75rem;">Ver</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="12" class="text-center text-muted py-4">Nenhum registro encontrado.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+{% endblock %}

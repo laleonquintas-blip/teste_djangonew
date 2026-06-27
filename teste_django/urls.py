@@ -6,6 +6,7 @@ from django.urls import path
 from financeiro.views import get_fornecedor_info, dashboard_financeiro, gerar_fixos_mensais, ajustar_saldos_bancos, fluxo_de_caixa
 from extras.views import cloudinary_usage_api, cloudinary_storage_page
 from core.views import trocar_senha_obrigatoria
+from workflow.views import relatorio_coberturas, painel_sla
 
 # --- PERSONALIZAÇÃO DO SISTEMA MALUPE ---
 admin.site.site_header = "Sistema Financeiro Malupe"
@@ -21,6 +22,8 @@ urlpatterns = [
     path('admin/financeiro/fluxo-de-caixa/', fluxo_de_caixa, name='fluxo_de_caixa'),
     path('admin/api/cloudinary-usage/', cloudinary_usage_api, name='api_cloudinary_usage'),
     path('admin/workflow/cloudinary-storage/', cloudinary_storage_page, name='cloudinary_storage_page'),
+    path('admin/monitoramento-rh/coberturas/', relatorio_coberturas, name='relatorio_coberturas'),
+    path('admin/workflow/painel-sla/', painel_sla, name='painel_sla'),
 
     # 2. API
     path('api/fornecedor-info/', get_fornecedor_info, name='api_fornecedor_info'),

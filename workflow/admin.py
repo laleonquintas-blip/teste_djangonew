@@ -15,7 +15,7 @@ import urllib.request
 
 from rangefilter.filters import DateRangeFilterBuilder
 
-from .models import Despesa, LogWorkflow, STATUS_WORKFLOW
+from .models import Despesa, LogWorkflow, STATUS_WORKFLOW, ConfiguracaoSLA
 from financeiro.models import ContasAPagar
 from core.models import UsuarioCustomizado
 
@@ -1060,3 +1060,23 @@ class DespesaAdmin(admin.ModelAdmin):
         return mark_safe(html)
 
     dialogo_display.short_description = "Histórico de Diálogo"
+
+
+@admin.register(ConfiguracaoSLA)
+class ConfiguracaoSLAAdmin(admin.ModelAdmin):
+    list_display = ('get_status_display_label', 'prazo_horas', 'prazo_formatado', 'ativo')
+    list_editable = ('prazo_horas', 'ativo')
+    ordering = ['status']
+
+    def get_status_display_label(self, obj):
+        return obj.get_status_display()
+    get_status_display_label.short_description = "Status"
+
+    def prazo_formatado(self, obj):
+        dias = obj.prazo_horas // 24
+        horas = obj.prazo_horas % 24
+        partes = []
+        if dias: partes.append(f"{dias}d")
+        if horas: partes.append(f"{horas}h")
+        return " ".join(partes) or f"{obj.prazo_horas}h"
+    prazo_formatado.short_description = "Prazo (legível)"

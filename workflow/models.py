@@ -89,6 +89,34 @@ class Despesa(models.Model):
         ]
 
 
+STATUS_COM_SLA = [
+    ('AGUARDANDO_COMERCIAL', 'Aguardando Comercial'),
+    ('AGUARDANDO_ADM', 'Aguardando Administrativo'),
+    ('AGUARDANDO_RH', 'Aguardando RH'),
+    ('AGUARDANDO_FIN', 'Aguardando Financeiro'),
+    ('DIRECIONADO_OP', 'Direcionado ao Operador'),
+]
+
+
+class ConfiguracaoSLA(models.Model):
+    status = models.CharField(
+        max_length=30, choices=STATUS_COM_SLA, unique=True, verbose_name="Status"
+    )
+    prazo_horas = models.PositiveIntegerField(
+        verbose_name="Prazo (horas)",
+        help_text="Tempo máximo permitido neste status antes de ser considerado atraso."
+    )
+    ativo = models.BooleanField(default=True, verbose_name="Ativo")
+
+    def __str__(self):
+        return f"{self.get_status_display()} — {self.prazo_horas}h"
+
+    class Meta:
+        verbose_name = "Configuração de SLA"
+        verbose_name_plural = "Configurações de SLA"
+        ordering = ['status']
+
+
 class LogWorkflow(models.Model):
     despesa = models.ForeignKey(Despesa, on_delete=models.CASCADE, related_name='logs')
     usuario = models.ForeignKey(UsuarioCustomizado, on_delete=models.PROTECT)
