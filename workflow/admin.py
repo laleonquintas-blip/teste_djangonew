@@ -1064,8 +1064,8 @@ class DespesaAdmin(admin.ModelAdmin):
 
 @admin.register(ConfiguracaoSLA)
 class ConfiguracaoSLAAdmin(admin.ModelAdmin):
-    list_display = ('get_status_display_label', 'prazo_horas', 'prazo_formatado', 'ativo')
-    list_editable = ('prazo_horas', 'ativo')
+    list_display = ('get_status_display_label', 'prazo_dias', 'prazo_horas', 'prazo_formatado', 'ativo')
+    list_editable = ('prazo_dias', 'prazo_horas', 'ativo')
     ordering = ['status']
 
     def get_status_display_label(self, obj):
@@ -1073,10 +1073,8 @@ class ConfiguracaoSLAAdmin(admin.ModelAdmin):
     get_status_display_label.short_description = "Status"
 
     def prazo_formatado(self, obj):
-        dias = obj.prazo_horas // 24
-        horas = obj.prazo_horas % 24
         partes = []
-        if dias: partes.append(f"{dias}d")
-        if horas: partes.append(f"{horas}h")
-        return " ".join(partes) or f"{obj.prazo_horas}h"
+        if obj.prazo_dias: partes.append(f"{obj.prazo_dias}d")
+        if obj.prazo_horas: partes.append(f"{obj.prazo_horas}h")
+        return " ".join(partes) or "0h"
     prazo_formatado.short_description = "Prazo (legível)"

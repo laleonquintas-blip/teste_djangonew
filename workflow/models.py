@@ -102,14 +102,28 @@ class ConfiguracaoSLA(models.Model):
     status = models.CharField(
         max_length=30, choices=STATUS_COM_SLA, unique=True, verbose_name="Status"
     )
+    prazo_dias = models.PositiveIntegerField(
+        default=0, verbose_name="Prazo (dias)",
+        help_text="Parte em dias do prazo máximo permitido neste status."
+    )
     prazo_horas = models.PositiveIntegerField(
-        verbose_name="Prazo (horas)",
-        help_text="Tempo máximo permitido neste status antes de ser considerado atraso."
+        default=0, verbose_name="Prazo (horas)",
+        help_text="Parte em horas (0-23) do prazo máximo permitido neste status."
     )
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
 
+    @property
+    def total_horas(self):
+        return self.prazo_dias * 24 + self.prazo_horas
+
     def __str__(self):
-        return f"{self.get_status_display()} — {self.prazo_horas}h"
+        partes = []
+        if self.prazo_dias:
+            partes.append(f"{self.prazo_dias}d")
+        if self.prazo_horas:
+            partes.append(f"{self.prazo_horas}h")
+        prazo_str = " ".join(partes) or "0h"
+        return f"{self.get_status_display()} — {prazo_str}"
 
     class Meta:
         verbose_name = "Configuração de SLA"

@@ -146,7 +146,7 @@ def painel_sla(request):
 
     # Carrega configurações de SLA ativas
     sla_map = {
-        s.status: s.prazo_horas
+        s.status: s.total_horas
         for s in ConfiguracaoSLA.objects.filter(ativo=True)
     }
 
