@@ -12,12 +12,13 @@
 
 {% block extrastyle %}{{ block.super }}
 <style>
-.sla-card { border-radius:10px; padding:18px 22px; color:#fff; display:flex; flex-direction:column; gap:4px; cursor:pointer; text-decoration:none; transition:transform .15s, box-shadow .15s; }
-.sla-card:hover { transform:translateY(-3px); box-shadow:0 6px 20px rgba(0,0,0,.25); color:#fff; text-decoration:none; }
+.sla-card { border-radius:10px; padding:18px 22px; color:#fff !important; display:flex; flex-direction:column; gap:4px; cursor:pointer; text-decoration:none !important; transition:transform .15s, box-shadow .15s; }
+.sla-card:hover, .sla-card:focus, .sla-card:visited { color:#fff !important; text-decoration:none !important; }
+.sla-card:hover { transform:translateY(-3px); box-shadow:0 6px 20px rgba(0,0,0,.25); }
 .sla-card.active-filter { outline:4px solid rgba(255,255,255,.8); transform:translateY(-3px); box-shadow:0 6px 20px rgba(0,0,0,.3); }
-.sla-card .sla-num  { font-size:2.2rem; font-weight:800; line-height:1; }
-.sla-card .sla-pct  { font-size:0.85rem; opacity:.85; }
-.sla-card .sla-lbl  { font-size:0.78rem; text-transform:uppercase; letter-spacing:.05em; opacity:.8; margin-top:4px; }
+.sla-card .sla-num  { font-size:2.2rem; font-weight:800; line-height:1; color:#fff !important; }
+.sla-card .sla-pct  { font-size:0.85rem; opacity:.9; color:#fff !important; }
+.sla-card .sla-lbl  { font-size:0.78rem; text-transform:uppercase; letter-spacing:.05em; opacity:.9; margin-top:4px; color:#fff !important; font-weight:600; }
 .card-no-prazo      { background: linear-gradient(135deg,#27ae60,#1e8449); }
 .card-a-vencer      { background: linear-gradient(135deg,#f39c12,#d68910); }
 .card-em-atraso     { background: linear-gradient(135deg,#e74c3c,#c0392b); }
