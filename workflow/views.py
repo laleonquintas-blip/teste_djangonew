@@ -142,8 +142,7 @@ def relatorio_coberturas(request):
 @staff_member_required
 def painel_sla(request):
     from .models import Despesa, ConfiguracaoSLA, LogWorkflow, STATUS_WORKFLOW
-    from django import contrib
-    import admin as django_admin
+    from django.contrib import admin as dj_admin
 
     # Carrega configurações de SLA ativas
     sla_map = {
@@ -250,7 +249,6 @@ def painel_sla(request):
     total = sum(contadores.values())
     pct = lambda v: round(v / total * 100) if total else 0
 
-    from django.contrib import admin as dj_admin
     context = {
         **dj_admin.site.each_context(request),
         'title': 'Painel de SLA — Workflow',
