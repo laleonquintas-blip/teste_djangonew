@@ -169,6 +169,11 @@ def _build_action_choices(grupos, status_atual, tipo_lancamento=None):
 # --- 1. FORMULÁRIO ---
 class DespesaForm(forms.ModelForm):
     tipo_reserva = forms.CharField(widget=forms.HiddenInput(), required=False)
+    confirmar_duplicidade = forms.BooleanField(
+        required=False,
+        label='✅ Confirmo que não é duplicidade e desejo salvar mesmo assim',
+        help_text='Marque esta opção para salvar mesmo com o aviso de duplicidade.',
+    )
     mensagem = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Adicione uma mensagem ou resposta (opcional)…'}),
         required=False,
@@ -306,7 +311,8 @@ class DespesaForm(forms.ModelForm):
             fornecedor = cleaned_data.get('fornecedor')
             valor = cleaned_data.get('valor')
             data_despesa = cleaned_data.get('data_despesa')
-            if fornecedor and valor and data_despesa:
+            confirmar = cleaned_data.get('confirmar_duplicidade')
+            if fornecedor and valor and data_despesa and not confirmar:
                 duplicadas = Despesa.objects.filter(
                     fornecedor=fornecedor,
                     valor=valor,
@@ -315,9 +321,9 @@ class DespesaForm(forms.ModelForm):
                 if duplicadas.exists():
                     ids = ', '.join(f'#{d.id}' for d in duplicadas)
                     raise forms.ValidationError(
-                        f'⚠️ Possível duplicidade detectada! Já existe uma solicitação com os mesmos '
-                        f'dados (Despesa + Valor + Data): {ids}. '
-                        f'Verifique antes de prosseguir. Se for intencional, cancele a solicitação duplicada.'
+                        f'⚠️ Possível duplicidade! Já existe uma solicitação com os mesmos dados '
+                        f'(Despesa + Valor + Data): {ids}. '
+                        f'Se desejar salvar mesmo assim, marque a opção abaixo e clique em Salvar novamente.'
                     )
 
         if self.instance.pk:
