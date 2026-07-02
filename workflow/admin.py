@@ -844,11 +844,11 @@ class DespesaAdmin(admin.ModelAdmin):
             # Alerta de duplicidade na criação
             duplicatas = self._detectar_duplicidade(obj)
             if duplicatas:
-                ids_fmt = ', '.join(f'WF#{i}' for i in duplicatas)
+                ids_fmt = ', '.join(f'#{i}' for i in duplicatas)
                 self.message_user(
                     request,
-                    f"⚠ Atenção: verifique esta solicitação. Foram encontradas solicitações para o mesmo colaborador "
-                    f"e filial nos últimos 7 dias: {ids_fmt}",
+                    f"⚠️ Possível duplicidade! Já existe uma solicitação com os mesmos dados "
+                    f"(Despesa + Valor + Data): {ids_fmt}.",
                     level='warning',
                 )
         else:
