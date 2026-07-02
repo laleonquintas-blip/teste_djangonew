@@ -680,6 +680,10 @@ class DespesaAdmin(admin.ModelAdmin):
                     '</ul>'
                 ),
             }))
+            fieldsets.append(('Confirmação de Duplicidade', {
+                'fields': ('confirmar_duplicidade',),
+                'description': 'Este campo aparece apenas se o sistema detectar uma possível duplicidade. Marque para confirmar e salvar mesmo assim.',
+            }))
             return fieldsets
 
         campos_aprovacao = ['status']
