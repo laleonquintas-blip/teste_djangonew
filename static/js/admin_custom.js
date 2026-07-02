@@ -90,26 +90,45 @@ onReady(function () {
         link.innerHTML = 'LIMPAR';
     });
 
-    // Confirmação de duplicidade: esconde o campo e só exibe quando há erro de duplicidade
+    // Modal de confirmação de duplicidade
 onReady(function () {
-    var row = document.querySelector('.field-confirmar_duplicidade');
-    if (!row) return;
-    var erros = document.querySelectorAll('.errornote, ul.errorlist');
-    var temDuplicidade = false;
+    var erros = document.querySelectorAll('.errornote, ul.errorlist li');
+    var msgDuplicidade = '';
     erros.forEach(function (el) {
-        if (el.textContent.indexOf('duplicidade') !== -1 || el.textContent.indexOf('Possível') !== -1) {
-            temDuplicidade = true;
+        if (el.textContent.indexOf('Possível duplicidade') !== -1) {
+            msgDuplicidade = el.textContent.trim();
         }
     });
-    if (temDuplicidade) {
-        row.style.background = '#fff8e1';
-        row.style.border = '2px solid #ffc107';
-        row.style.borderRadius = '6px';
-        row.style.padding = '12px';
-        row.style.marginTop = '12px';
-    } else {
-        row.style.display = 'none';
-    }
+    if (!msgDuplicidade) return;
+
+    // Cria o modal
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+    var box = document.createElement('div');
+    box.style.cssText = 'background:#fff;border-radius:12px;padding:32px 28px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
+    box.innerHTML = '<div style="font-size:2rem;text-align:center;">⚠️</div>'
+        + '<h3 style="text-align:center;color:#856404;margin:12px 0 8px;">Possível Duplicidade</h3>'
+        + '<p style="color:#555;font-size:0.95rem;margin-bottom:24px;">' + msgDuplicidade.replace('Se desejar salvar mesmo assim, marque a opção abaixo e clique em Salvar novamente.', '') + '</p>'
+        + '<p style="color:#333;font-weight:600;text-align:center;margin-bottom:20px;">Deseja salvar mesmo assim?</p>'
+        + '<div style="display:flex;gap:12px;">'
+        + '<button id="dup-sim" style="flex:1;padding:12px;background:#dc3545;color:#fff;border:none;border-radius:6px;font-size:1rem;font-weight:700;cursor:pointer;">Sim, salvar mesmo assim</button>'
+        + '<button id="dup-nao" style="flex:1;padding:12px;background:#6c757d;color:#fff;border:none;border-radius:6px;font-size:1rem;font-weight:700;cursor:pointer;">Não, cancelar</button>'
+        + '</div>';
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    document.getElementById('dup-nao').addEventListener('click', function () {
+        overlay.remove();
+    });
+
+    document.getElementById('dup-sim').addEventListener('click', function () {
+        var campo = document.querySelector('input[name="confirmar_duplicidade"]');
+        if (campo) campo.value = 'on';
+        overlay.remove();
+        document.querySelector('[name="_save"]').click();
+    });
 });
 
 document.querySelectorAll('.admindatefilter .controls input[type="submit"], .admindatefilter .controls button').forEach(function (btn) {

@@ -171,8 +171,7 @@ class DespesaForm(forms.ModelForm):
     tipo_reserva = forms.CharField(widget=forms.HiddenInput(), required=False)
     confirmar_duplicidade = forms.BooleanField(
         required=False,
-        label='✅ Confirmo que não é duplicidade e desejo salvar mesmo assim',
-        help_text='Marque esta opção para salvar mesmo com o aviso de duplicidade.',
+        widget=forms.HiddenInput(),
     )
     mensagem = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Adicione uma mensagem ou resposta (opcional)…'}),
@@ -647,8 +646,6 @@ class DespesaAdmin(admin.ModelAdmin):
                 'observacoes'
             )
 
-        if not obj:
-            campos_lancamento = list(campos_lancamento) + ['confirmar_duplicidade']
         fieldsets = [
             ('Dados do Lançamento', {
                 'fields': campos_lancamento
