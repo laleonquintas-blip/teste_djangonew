@@ -92,13 +92,20 @@ onReady(function () {
 
     // Modal de confirmação de duplicidade
 onReady(function () {
-    var erros = document.querySelectorAll('.errornote, ul.errorlist li');
+    // Busca a mensagem de duplicidade em qualquer elemento da página
     var msgDuplicidade = '';
-    erros.forEach(function (el) {
-        if (el.textContent.indexOf('Possível duplicidade') !== -1) {
-            msgDuplicidade = el.textContent.trim();
-        }
+    var seletores = ['.errornote', 'ul.errorlist li', '.alert', '.alert-danger', 'p.errornote', '.form-errors li'];
+    seletores.forEach(function (sel) {
+        document.querySelectorAll(sel).forEach(function (el) {
+            if (el.textContent.indexOf('Possível duplicidade') !== -1 && !msgDuplicidade) {
+                msgDuplicidade = el.textContent.trim();
+            }
+        });
     });
+    // Fallback: busca em todo o body
+    if (!msgDuplicidade && document.body.innerHTML.indexOf('Possível duplicidade') !== -1) {
+        msgDuplicidade = 'Já existe uma solicitação com os mesmos dados (Despesa + Valor + Data).';
+    }
     if (!msgDuplicidade) return;
 
     // Cria o modal
