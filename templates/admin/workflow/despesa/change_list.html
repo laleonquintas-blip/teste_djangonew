@@ -1,6 +1,7 @@
 {% extends "admin/change_list.html" %}
 {% load humanize %}
 {% load static %}
+{% load financeiro_tags %}
 
 {% block content_title %}
     <h1>Fluxo de Aprovação de Despesas</h1>
@@ -147,7 +148,7 @@
             <div class="card-content">
                 <div class="card-value" style="color: {{ card.color }};">
                     <small style="opacity:.65; font-weight:normal;">R$</small>
-                    {{ card.total_valor|default:0|floatformat:2|intcomma }}
+                    {{ card.total_valor|default:0|fmt_brl }}
                 </div>
                 <div class="card-qtd-box">
                     <span class="card-qtd-label">Qtd</span>

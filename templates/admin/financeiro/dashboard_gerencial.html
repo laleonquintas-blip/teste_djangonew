@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load i18n static humanize %}
+{% load i18n static humanize financeiro_tags %}
 
 {% block extrastyle %}
 {{ block.super }}
@@ -17,7 +17,7 @@
     .card-dashboard:hover { transform: translateY(-5px); }
     .card-header-custom { padding: 15px; font-weight: bold; text-transform: uppercase; font-size: 0.9rem; }
     .card-body-custom { padding: 20px; }
-    .big-number { font-size: 1.8rem; font-weight: 800; margin-bottom: 0; }
+    .big-number { font-size: 1.4rem; font-weight: 800; margin-bottom: 0; }
     .text-small { font-size: 0.8rem; opacity: 0.8; }
     .border-left-primary { border-left: 5px solid #4e73df; }
     .border-left-success { border-left: 5px solid #1cc88a; }
@@ -99,14 +99,14 @@
                                 {{ banco.nome }}
                             </div>
                             <div class="big-number text-gray-800">
-                                R$ {{ banco.saldo|floatformat:2|intcomma }}
+                                R$ {{ banco.saldo|fmt_brl }}
                             </div>
                             <div class="mt-2 text-small">
                                 <span class="text-success mr-2" title="Entradas até a data">
-                                    <i class="fas fa-arrow-up"></i> {{ banco.entradas|floatformat:2|intcomma }}
+                                    <i class="fas fa-arrow-up"></i> {{ banco.entradas|fmt_brl }}
                                 </span>
                                 <span class="text-danger" title="Saídas até a data">
-                                    <i class="fas fa-arrow-down"></i> {{ banco.saidas|floatformat:2|intcomma }}
+                                    <i class="fas fa-arrow-down"></i> {{ banco.saidas|fmt_brl }}
                                 </span>
                             </div>
                         </div>
@@ -132,7 +132,7 @@
                                 Saldo Geral Consolidado
                             </div>
                             <div class="big-number text-white">
-                                R$ {{ saldo_geral|floatformat:2|intcomma }}
+                                R$ {{ saldo_geral|fmt_brl }}
                             </div>
                             <div class="mt-2 text-small text-white">
                                 Na data {{ data_referencia|date:"d/m/Y" }}
@@ -164,7 +164,7 @@
                         <div class="col-6 border-right">
                             <a href="/admin/financeiro/contasareceber/?status_real=VENCIDO" class="text-decoration-none d-block clickable-card-col p-2">
                                 <h6 class="text-danger font-weight-bold mb-1">VENCIDOS <br><small>(Antes de {{ data_referencia|date:"d/m" }})</small></h6>
-                                <h3 class="text-danger mb-0">R$ {{ cr.vencidos_valor|floatformat:2|intcomma }}</h3>
+                                <h3 class="text-danger mb-0">R$ {{ cr.vencidos_valor|fmt_brl }}</h3>
                                 <small class="badge badge-danger mt-2 mb-3">{{ cr.vencidos_qtd }} Títulos</small>
                                 <div><small class="text-muted"><i class="fas fa-external-link-alt"></i> Ver lista</small></div>
                             </a>
@@ -172,7 +172,7 @@
                         <div class="col-6">
                             <a href="/admin/financeiro/contasareceber/?status_real=A_VENCER" class="text-decoration-none d-block clickable-card-col p-2">
                                 <h6 class="text-success font-weight-bold mb-1">A VENCER <br><small>(Após {{ data_referencia|date:"d/m" }})</small></h6>
-                                <h3 class="text-success mb-0">R$ {{ cr.a_vencer_valor|floatformat:2|intcomma }}</h3>
+                                <h3 class="text-success mb-0">R$ {{ cr.a_vencer_valor|fmt_brl }}</h3>
                                 <small class="badge badge-success mt-2 mb-3">{{ cr.a_vencer_qtd }} Títulos</small>
                                 <div><small class="text-muted"><i class="fas fa-external-link-alt"></i> Ver lista</small></div>
                             </a>
@@ -192,7 +192,7 @@
                         <div class="col-6 border-right">
                             <a href="/admin/financeiro/contasapagar/?status_real=VENCIDO" class="text-decoration-none d-block clickable-card-col p-2">
                                 <h6 class="text-danger font-weight-bold mb-1">VENCIDOS <br><small>(Antes de {{ data_referencia|date:"d/m" }})</small></h6>
-                                <h3 class="text-danger mb-0">R$ {{ cp.vencidos_valor|floatformat:2|intcomma }}</h3>
+                                <h3 class="text-danger mb-0">R$ {{ cp.vencidos_valor|fmt_brl }}</h3>
                                 <small class="badge badge-danger mt-2 mb-3">{{ cp.vencidos_qtd }} Títulos</small>
                                 <div><small class="text-muted"><i class="fas fa-external-link-alt"></i> Ver lista</small></div>
                             </a>
@@ -200,7 +200,7 @@
                         <div class="col-6">
                             <a href="/admin/financeiro/contasapagar/?status_real=A_VENCER" class="text-decoration-none d-block clickable-card-col p-2">
                                 <h6 class="text-warning font-weight-bold mb-1" style="color: #fd7e14 !important;">A VENCER <br><small>(Após {{ data_referencia|date:"d/m" }})</small></h6>
-                                <h3 class="text-warning mb-0" style="color: #fd7e14 !important;">R$ {{ cp.a_vencer_valor|floatformat:2|intcomma }}</h3>
+                                <h3 class="text-warning mb-0" style="color: #fd7e14 !important;">R$ {{ cp.a_vencer_valor|fmt_brl }}</h3>
                                 <small class="badge badge-warning mt-2 mb-3">{{ cp.a_vencer_qtd }} Títulos</small>
                                 <div><small class="text-muted"><i class="fas fa-external-link-alt"></i> Ver lista</small></div>
                             </a>
