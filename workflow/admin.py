@@ -243,10 +243,16 @@ class DespesaForm(forms.ModelForm):
         if 'motivo_ausencia' in self.fields:
             try:
                 from cadastros.models import MotivoAusencia, Colaborador
-                motivo_vagas = MotivoAusencia.objects.get(nome__icontains='Vagas em aberto')
-                colab_freelance = Colaborador.objects.get(nome__iexact='FREE LANCE - VAGAS EM ABERTO')
-                self.fields['motivo_ausencia'].widget.attrs['data-vagas-motivo-id'] = motivo_vagas.id
-                self.fields['motivo_ausencia'].widget.attrs['data-vagas-colab-id'] = colab_freelance.id
+                # Usa cache de classe para não repetir query a cada abertura de form
+                if not hasattr(DespesaForm, '_vagas_ids'):
+                    motivo_vagas = MotivoAusencia.objects.filter(nome__icontains='Vagas em aberto').values_list('id', flat=True).first()
+                    colab_freelance = Colaborador.objects.filter(nome__iexact='FREE LANCE - VAGAS EM ABERTO').values_list('id', flat=True).first()
+                    DespesaForm._vagas_ids = (motivo_vagas, colab_freelance)
+                vagas_motivo_id, vagas_colab_id = DespesaForm._vagas_ids
+                if vagas_motivo_id:
+                    self.fields['motivo_ausencia'].widget.attrs['data-vagas-motivo-id'] = vagas_motivo_id
+                if vagas_colab_id:
+                    self.fields['motivo_ausencia'].widget.attrs['data-vagas-colab-id'] = vagas_colab_id
             except Exception:
                 pass
 
@@ -294,6 +300,25 @@ class DespesaForm(forms.ModelForm):
                 datas_validas = [p.strip() for p in dias_cob.split(',') if p.strip()]
                 if not datas_validas:
                     self.add_error('dias_cobertura', 'Selecione pelo menos uma data de cobertura.')
+
+        # Verifica duplicidade ao criar nova despesa
+        if not self.instance.pk:
+            fornecedor = cleaned_data.get('fornecedor')
+            valor = cleaned_data.get('valor')
+            data_despesa = cleaned_data.get('data_despesa')
+            if fornecedor and valor and data_despesa:
+                duplicadas = Despesa.objects.filter(
+                    fornecedor=fornecedor,
+                    valor=valor,
+                    data_despesa=data_despesa,
+                ).exclude(status='CANCELADO')
+                if duplicadas.exists():
+                    ids = ', '.join(f'#{d.id}' for d in duplicadas)
+                    raise forms.ValidationError(
+                        f'⚠️ Possível duplicidade detectada! Já existe uma solicitação com os mesmos '
+                        f'dados (Despesa + Valor + Data): {ids}. '
+                        f'Verifique antes de prosseguir. Se for intencional, cancele a solicitação duplicada.'
+                    )
 
         if self.instance.pk:
             protegidos = [
@@ -385,6 +410,7 @@ class LogInline(admin.TabularInline):
 class DespesaAdmin(admin.ModelAdmin):
     form = DespesaForm
     inlines = [LogInline]
+    autocomplete_fields = ['colaborador_info']
 
     change_list_template = "admin/workflow/despesa/change_list.html"
     change_form_template = "admin/workflow/despesa/change_form.html"
@@ -500,7 +526,9 @@ class DespesaAdmin(admin.ModelAdmin):
 
     # --- VISIBILIDADE ---
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
+        qs = super().get_queryset(request).select_related(
+            'fornecedor', 'solicitante', 'operador', 'tomador', 'filial'
+        )
         user = request.user
 
         if user.is_superuser:
@@ -563,7 +591,7 @@ class DespesaAdmin(admin.ModelAdmin):
                 'solicitante', 'data_despesa', 'fornecedor', 'valor', 'observacoes',
                 'comprovante', 'inicio_cobertura', 'fim_cobertura', 'dias_cobertura',
                 'tomador', 'filial', 'motivo_ausencia', 'colaborador_faltou',
-                'nome_cobriu', 'forma_pagamento', 'dados_bancarios_pagto'
+                'colaborador_info', 'forma_pagamento', 'dados_bancarios_pagto'
             ]
             ro_fields.extend(campos_travados_padrao)
 
@@ -596,7 +624,9 @@ class DespesaAdmin(admin.ModelAdmin):
                 ('motivo_ausencia', 'colaborador_faltou'),
                 'dias_cobertura',
                 'solicitante',
-                ('nome_cobriu', 'dados_bancarios_pagto'),
+                'colaborador_info',
+                'forma_pagamento',
+                'dados_bancarios_pagto',
                 'observacoes'
             )
         else:  # EXTRA
@@ -747,7 +777,40 @@ class DespesaAdmin(admin.ModelAdmin):
 
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    def _detectar_duplicidade(self, obj):
+        """Retorna lista de WFs suspeitos de duplicidade (mesmo colaborador_info + filial nos últimos 7 dias)."""
+        from django.utils import timezone
+        import datetime
+        if not obj or obj.tipo_lancamento != 'SOLICITACAO' or not obj.colaborador_info_id:
+            return []
+        limite = timezone.now().date() - datetime.timedelta(days=7)
+        qs = Despesa.objects.filter(
+            tipo_lancamento='SOLICITACAO',
+            colaborador_info_id=obj.colaborador_info_id,
+            filial_id=obj.filial_id,
+            data_criacao__date__gte=limite,
+        ).exclude(status='CANCELADO')
+        if obj.pk:
+            qs = qs.exclude(pk=obj.pk)
+        return list(qs.values_list('id', flat=True).order_by('-id'))
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        if object_id:
+            try:
+                obj = Despesa.objects.get(pk=object_id)
+                duplicatas = self._detectar_duplicidade(obj)
+                if duplicatas:
+                    extra_context['alerta_duplicidade'] = duplicatas
+            except Despesa.DoesNotExist:
+                pass
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
     def save_model(self, request, obj, form, change):
+        # Sincroniza nome_cobriu a partir do colaborador_info (campo oculto mas mantido no banco)
+        if obj.colaborador_info_id and obj.colaborador_info:
+            obj.nome_cobriu = obj.colaborador_info.nome.upper()
+
         if not obj.pk:
             obj.solicitante = request.user
             if form.cleaned_data.get('tipo_lancamento'):
@@ -769,6 +832,17 @@ class DespesaAdmin(admin.ModelAdmin):
                     obj.status = 'AGUARDANDO_RH'
 
             acao_log = "Criou Registro"
+
+            # Alerta de duplicidade na criação
+            duplicatas = self._detectar_duplicidade(obj)
+            if duplicatas:
+                ids_fmt = ', '.join(f'WF#{i}' for i in duplicatas)
+                self.message_user(
+                    request,
+                    f"⚠ Atenção: verifique esta solicitação. Foram encontradas solicitações para o mesmo colaborador "
+                    f"e filial nos últimos 7 dias: {ids_fmt}",
+                    level='warning',
+                )
         else:
             # Detecta ação específica pelo status novo
             status_novo = obj.status
@@ -809,7 +883,17 @@ class DespesaAdmin(admin.ModelAdmin):
             self.gerar_contas_a_pagar(obj, request)
 
         if change and obj.status == 'CONFERIDO' and obj.tipo_lancamento == 'CAIXINHA' and 'status' in form.changed_data:
-            self.registrar_utilizacao_supervisor(obj, request)
+            from financeiro.models import SaldoSupervisor
+            if not SaldoSupervisor.objects.filter(supervisor=obj.solicitante, status='ABERTO').exists():
+                status_anterior = Despesa.objects.get(pk=obj.pk).status
+                obj.status = status_anterior
+                self.message_user(
+                    request,
+                    f"Não é possível conferir: {obj.solicitante.first_name} não possui ciclo de saldo supervisor em aberto.",
+                    level='error',
+                )
+            else:
+                self.registrar_utilizacao_supervisor(obj, request)
 
         super().save_model(request, obj, form, change)
 
@@ -885,13 +969,14 @@ class DespesaAdmin(admin.ModelAdmin):
     def registrar_utilizacao_supervisor(self, despesa, request):
         from financeiro.models import SaldoSupervisor, MovimentacaoSupervisor
         supervisor = despesa.solicitante
+
+        # Só debita se o solicitante já tiver um ciclo aberto — nunca cria ciclo automaticamente
         saldo_sup = SaldoSupervisor.objects.filter(
             supervisor=supervisor, status='ABERTO'
         ).order_by('-data_inicio').first()
         if not saldo_sup:
-            saldo_sup = SaldoSupervisor.objects.create(supervisor=supervisor)
-            nome = supervisor.first_name.strip() or supervisor.username
-            self.message_user(request, f"Ciclo de saldo criado automaticamente para {nome} ({saldo_sup.numero}).", level='SUCCESS')
+            return
+
         MovimentacaoSupervisor.objects.create(
             saldo_supervisor=saldo_sup,
             tipo='DEBITO',
