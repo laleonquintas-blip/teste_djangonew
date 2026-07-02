@@ -646,6 +646,8 @@ class DespesaAdmin(admin.ModelAdmin):
                 'observacoes'
             )
 
+        if not obj:
+            campos_lancamento = list(campos_lancamento) + ['confirmar_duplicidade']
         fieldsets = [
             ('Dados do Lançamento', {
                 'fields': campos_lancamento
