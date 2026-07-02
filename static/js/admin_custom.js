@@ -19,6 +19,14 @@ onReady(function () {
         document.body.classList.add('dark-mode');
     }
 
+    // ── 1b. Força sidebar sempre visível (impede AdminLTE de colapsar para o topo) ──
+    document.body.classList.remove('sidebar-collapse', 'sidebar-mini-xs', 'sidebar-mini');
+    try {
+        localStorage.removeItem('lte3|sidenav|collapsed');
+        localStorage.removeItem('lte|sidenav|collapsed');
+    } catch (e) {}
+
+
     // ── 2. Injeta botão dark/light na navbar ─────────────────────────────────
     var isDark = document.body.classList.contains('dark-mode');
     var navRight = document.querySelector('.navbar-nav.ml-auto');
@@ -43,6 +51,24 @@ onReady(function () {
         navRight.insertBefore(li, navRight.firstChild);
     }
 
+    // ── 2b. Bloqueia duplo envio de formulário ───────────────────────────────
+    document.querySelectorAll('form[method="post"]').forEach(function (form) {
+        var enviado = false;
+        form.addEventListener('submit', function (e) {
+            if (enviado) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                return false;
+            }
+            enviado = true;
+            form.querySelectorAll('input[type="submit"], button[type="submit"]').forEach(function (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                btn.style.cursor = 'not-allowed';
+            });
+        });
+    });
+
     // ── 3. Remove campo fantasma 'q' da sidebar ──────────────────────────────
     document.querySelectorAll('#changelist-filter input[name="q"]').forEach(function (el) {
         el.remove();
@@ -64,7 +90,29 @@ onReady(function () {
         link.innerHTML = 'LIMPAR';
     });
 
-    document.querySelectorAll('.admindatefilter .controls input[type="submit"], .admindatefilter .controls button').forEach(function (btn) {
+    // Confirmação de duplicidade: esconde o campo e só exibe quando há erro de duplicidade
+onReady(function () {
+    var row = document.querySelector('.field-confirmar_duplicidade');
+    if (!row) return;
+    var erros = document.querySelectorAll('.errornote, ul.errorlist');
+    var temDuplicidade = false;
+    erros.forEach(function (el) {
+        if (el.textContent.indexOf('duplicidade') !== -1 || el.textContent.indexOf('Possível') !== -1) {
+            temDuplicidade = true;
+        }
+    });
+    if (temDuplicidade) {
+        row.style.background = '#fff8e1';
+        row.style.border = '2px solid #ffc107';
+        row.style.borderRadius = '6px';
+        row.style.padding = '12px';
+        row.style.marginTop = '12px';
+    } else {
+        row.style.display = 'none';
+    }
+});
+
+document.querySelectorAll('.admindatefilter .controls input[type="submit"], .admindatefilter .controls button').forEach(function (btn) {
         Object.assign(btn.style, {
             width: '48%', backgroundColor: '#007bff', color: 'white',
             border: 'none', padding: '10px', borderRadius: '4px',

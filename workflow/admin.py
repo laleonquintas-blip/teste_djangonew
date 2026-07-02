@@ -647,6 +647,8 @@ class DespesaAdmin(admin.ModelAdmin):
                 'observacoes'
             )
 
+        if not obj:
+            campos_lancamento = list(campos_lancamento) + ['confirmar_duplicidade']
         fieldsets = [
             ('Dados do Lançamento', {
                 'fields': campos_lancamento
@@ -680,10 +682,7 @@ class DespesaAdmin(admin.ModelAdmin):
                     '</ul>'
                 ),
             }))
-            fieldsets.append(('Confirmação de Duplicidade', {
-                'fields': ('confirmar_duplicidade',),
-                'description': 'Este campo aparece apenas se o sistema detectar uma possível duplicidade. Marque para confirmar e salvar mesmo assim.',
-            }))
+            # confirmar_duplicidade é injetado via JS no topo do form quando há erro
             return fieldsets
 
         campos_aprovacao = ['status']
