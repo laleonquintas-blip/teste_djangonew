@@ -194,6 +194,64 @@ class StatusFilter(admin.SimpleListFilter):
             return queryset.filter(status='CANCELADO')
 
 
+class SSSupervisorFilter(_TextFilter):
+    title = 'Supervisor'
+    parameter_name = 'ss_supervisor'
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(supervisor__first_name__icontains=self.value())
+
+
+class SSNumeroFilter(_TextFilter):
+    title = 'Número'
+    parameter_name = 'ss_numero'
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(numero__icontains=self.value())
+
+
+class SSInicioDe(_TextFilter):
+    title = 'Início De'
+    parameter_name = 'ss_inicio_de'
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(data_inicio__gte=self.value())
+
+
+class SSInicioAte(_TextFilter):
+    title = 'Início Até'
+    parameter_name = 'ss_inicio_ate'
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(data_inicio__lte=self.value())
+
+
+class SSStatusFilter(admin.SimpleListFilter):
+    title = 'Status'
+    parameter_name = 'ss_status'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('ABERTO', 'Aberto'),
+            ('FECHADO', 'Fechado'),
+            ('CANCELADO', 'Cancelado'),
+        )
+
+    def choices(self, changelist):
+        return []
+
+    def has_output(self):
+        return True
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(status=self.value())
+
+
 class BancoPagarFilter(admin.SimpleListFilter):
     title = 'Banco'
     parameter_name = 'banco_pagar'
@@ -469,6 +527,24 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
             obj.usuario_baixa = request.user
         obj.save(request=request)
 
+    def delete_model(self, request, obj):
+        try:
+            obj.delete()
+        except ValueError as e:
+            self.message_user(request, str(e), level='error')
+
+    def delete_queryset(self, request, queryset):
+        # Garante que o delete() customizado do model rode mesmo no delete em massa
+        erros = []
+        for obj in queryset:
+            try:
+                obj.delete()
+            except ValueError as e:
+                erros.append(str(e))
+        if erros:
+            for msg in erros:
+                self.message_user(request, msg, level='error')
+
     class Media:
         js = ('js/cp_plano_de_contas.js',)
 
@@ -489,7 +565,7 @@ class ContasAReceberAdmin(ImportExportModelAdmin):
     )
     date_hierarchy = 'vencimento'
     readonly_fields = ('data_baixa', 'usuario_baixa')
-    exclude = ('nota',)
+    exclude = ('nota', 'escala_horas')
     actions = [marcar_como_pago, marcar_como_cancelado, marcar_como_pendente]
 
     def changelist_view(self, request, extra_context=None):
@@ -780,7 +856,7 @@ class SaldoSupervisorAdmin(admin.ModelAdmin):
     change_form_template = 'admin/financeiro/saldosupervisor/change_form.html'
     change_list_template = 'admin/financeiro/saldosupervisor/change_list.html'
     list_display = ('numero', 'nome_supervisor', 'data_inicio', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display', 'status_display')
-    list_filter = ('status',)
+    list_filter = (SSNumeroFilter, SSSupervisorFilter, SSInicioDe, SSInicioAte, SSStatusFilter)
     readonly_fields = ('numero', 'supervisor', 'saldo_disponivel', 'data_inicio', 'status', 'fechado_por', 'data_fechamento', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display')
     fields = ('numero', 'supervisor', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display', 'data_inicio', 'status', 'fechado_por', 'data_fechamento')
     inlines = [MovimentacaoInline]
@@ -791,25 +867,6 @@ class SaldoSupervisorAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        numero = request.GET.get('ss_numero', '').strip()
-        supervisor = request.GET.get('ss_supervisor', '').strip()
-        inicio_de = request.GET.get('ss_inicio_de', '').strip()
-        inicio_ate = request.GET.get('ss_inicio_ate', '').strip()
-        status = request.GET.get('ss_status', '').strip()
-        if numero:
-            qs = qs.filter(numero__icontains=numero)
-        if supervisor:
-            qs = qs.filter(supervisor__first_name__icontains=supervisor)
-        if inicio_de:
-            qs = qs.filter(data_inicio__gte=inicio_de)
-        if inicio_ate:
-            qs = qs.filter(data_inicio__lte=inicio_ate)
-        if status:
-            qs = qs.filter(status=status)
-        return qs
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         if request.method == 'POST' and '_fechar_ciclo_btn' in request.POST and object_id:
@@ -842,6 +899,8 @@ class SaldoSupervisorAdmin(admin.ModelAdmin):
     def status_display(self, obj):
         if obj.status == 'ABERTO':
             return format_html('<span style="background:#f1c40f;color:#000;padding:3px 10px;border-radius:4px;font-weight:bold;">Aberto</span>')
+        if obj.status == 'CANCELADO':
+            return format_html('<span style="background:#c0392b;color:#fff;padding:3px 10px;border-radius:4px;font-weight:bold;">Cancelado</span>')
         return format_html('<span style="background:#27ae60;color:#fff;padding:3px 10px;border-radius:4px;font-weight:bold;">Fechado</span>')
     status_display.short_description = "Status"
     status_display.admin_order_field = 'status'

@@ -36,19 +36,20 @@
         <option value="">— Todos —</option>
         <option value="ABERTO">Aberto</option>
         <option value="FECHADO">Fechado</option>
+        <option value="CANCELADO">Cancelado</option>
       </select>
     </div>
 
   </div>
   <div class="cfb-actions" style="margin-top:10px;">
-    <button class="cfb-btn cfb-btn-search" onclick="cfbApply({
+    <button type="button" class="cfb-btn cfb-btn-search" onclick="cfbApply({
       ss_numero: cfbVal('cfb_numero'),
       ss_supervisor: cfbVal('cfb_supervisor'),
       ss_inicio_de: cfbVal('cfb_ini_de'),
       ss_inicio_ate: cfbVal('cfb_ini_ate'),
       ss_status: cfbVal('cfb_status')
     })">🔍 Pesquisar</button>
-    <button class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
+    <button type="button" class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
   </div>
 </div>
 

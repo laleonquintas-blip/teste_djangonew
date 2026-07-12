@@ -135,6 +135,7 @@ JAZZMIN_SETTINGS = {
     "order_with_respect_to": ["workflow", "monitoramento_rh", "financeiro", "cadastros", "core"],
 
     "icons": {
+        "core": "fas fa-user-plus",
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
         "auth.Group": "fas fa-users",
@@ -154,6 +155,9 @@ JAZZMIN_SETTINGS = {
         "core": "fas fa-cog",
         "monitoramento_rh": "fas fa-heartbeat",
         "monitoramento_rh.coberturasrh": "fas fa-user-clock",
+        "monitoramento_rh.folha": "fas fa-file-alt",
+        "monitoramento_rh.colaboradorinformal": "fas fa-users",
+        "monitoramento_rh.pagamentofolha": "fas fa-money-check-alt",
     },
 
     # 1. ADICIONA LINKS CUSTOMIZADOS NO MENU
@@ -209,6 +213,7 @@ JAZZMIN_SETTINGS = {
 }
 
 JAZZMIN_UI_TWEAKS = {
+    "search_on_top": True,
     "sidebar_fixed": True,
     "navbar_fixed": False,
     "footer_fixed": False,

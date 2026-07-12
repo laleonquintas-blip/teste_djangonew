@@ -4,7 +4,7 @@ from import_export.admin import ImportExportModelAdmin
 from import_export.widgets import CharWidget
 from .models import (
     Banco, Empresa, Cliente, Fornecedor,
-    Colaborador, Tomador, TipoServico,
+    Colaborador, ColaboradorInfo, Tomador, TipoServico,
     MotivoAusencia, Filial, PlanoDeContas
 )
 
@@ -16,18 +16,31 @@ class ColaboradorResource(resources.ModelResource):
     cpf = fields.Field(attribute='cpf', column_name='cpf')
     departamento = fields.Field(attribute='departamento', column_name='departamento')
     empresa = fields.Field(attribute='empresa', column_name='empresa')
+    filial = fields.Field(column_name='filial')
 
     class Meta:
         model = Colaborador
-        import_id_fields = ('cpf',)   # CPF é a chave — evita duplicatas
-        fields = ('nome', 'cpf', 'departamento', 'empresa')
-        export_order = ('nome', 'cpf', 'departamento', 'empresa')
+        import_id_fields = ('cpf',)
+        fields = ('nome', 'cpf', 'departamento', 'empresa', 'filial')
+        export_order = ('nome', 'cpf', 'departamento', 'empresa', 'filial')
         skip_unchanged = True
         report_skipped = True
 
     def before_import_row(self, row, **kwargs):
         if not row.get('departamento'):
             row['departamento'] = ''
+
+    def dehydrate_filial(self, obj):
+        return obj.filial.nome if obj.filial else ''
+
+    def import_field(self, field, obj, data, is_m2m=False, **kwargs):
+        if field.column_name == 'filial':
+            nome_filial = data.get('filial', '').strip()
+            if nome_filial:
+                filial_obj = Filial.objects.filter(nome__iexact=nome_filial).first()
+                obj.filial = filial_obj
+            return
+        super().import_field(field, obj, data, is_m2m, **kwargs)
 
 
 class FilialResource(resources.ModelResource):
@@ -59,9 +72,8 @@ class TomadorResource(resources.ModelResource):
 
 class ColaboradorAdmin(ImportExportModelAdmin):
     resource_classes = [ColaboradorResource]
-    list_display = ('id', 'nome', 'cpf', 'departamento', 'empresa')
-    search_fields = ('nome', 'cpf')
-
+    list_display = ('id', 'nome', 'cpf', 'departamento', 'empresa', 'filial')
+    search_fields = ('nome', 'cpf', 'departamento', 'empresa')
 
 class FilialAdmin(ImportExportModelAdmin):
     resource_classes = [FilialResource]
@@ -100,7 +112,30 @@ class FornecedorAdmin(admin.ModelAdmin):
     search_fields = ('razao_social', 'cnpj_cpf')
 
 
+class ColaboradorInfoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nome', 'cpf', 'tipo_pix', 'chave_pix')
+    search_fields = ('nome', 'cpf', 'chave_pix')
+    list_per_page = 30
+    fields = ('nome', 'cpf', 'tipo_pix', 'chave_pix', 'observacoes')
+
+    def has_module_perms(self, request):
+        return request.user.is_active
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_active
+
+    def has_add_permission(self, request):
+        return request.user.is_active
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_active
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
 # --- REGISTRO ---
+admin.site.register(ColaboradorInfo, ColaboradorInfoAdmin)
 
 admin.site.register(Banco)
 admin.site.register(Empresa)

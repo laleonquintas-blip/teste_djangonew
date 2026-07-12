@@ -43,6 +43,22 @@
 
 .ico { display:inline-block; transition: transform .2s; }
 .ico.open { transform: rotate(90deg); }
+
+/* ── DARK MODE (Jazzmin adiciona dark-mode no body) ── */
+body.dark-mode .fc-table th,
+body.dark-mode .fc-table td { border-color: #444; }
+
+body.dark-mode .row-group    { background: #2a2d35; color: #e0e0e0; }
+body.dark-mode .row-group:hover { background: #32363f; }
+body.dark-mode .row-subgroup { background: #1e2538; color: #a8c4f0; }
+body.dark-mode .row-subgroup:hover { background: #253050; }
+body.dark-mode .row-subgroup td:first-child { color: #7aaff0; }
+body.dark-mode .row-item     { background: #1a1d24; color: #ccc; }
+body.dark-mode .row-item td:first-child { color: #aaa; }
+
+body.dark-mode .val-e { color: #4cd98a; }
+body.dark-mode .val-d { color: #f07070; }
+body.dark-mode .val-z { color: #555; }
 </style>
 {% endblock %}
 

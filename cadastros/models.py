@@ -1,4 +1,19 @@
 from django.db import models
+from django.core.exceptions import ValidationError
+import re
+
+
+def validar_cpf(value):
+    cpf = re.sub(r'\D', '', value or '')
+    if not cpf:
+        return
+    if len(cpf) != 11 or cpf == cpf[0] * 11:
+        raise ValidationError('CPF inválido.')
+    for i in range(9, 11):
+        soma = sum(int(cpf[j]) * (i + 1 - j) for j in range(i))
+        digito = (soma * 10 % 11) % 10
+        if digito != int(cpf[i]):
+            raise ValidationError('CPF inválido.')
 
 
 # --- MODELOS SIMPLES ---
@@ -45,8 +60,8 @@ class MotivoAusencia(models.Model):
         return self.nome
 
     class Meta:
-        verbose_name = "Motivo de Ausência"
-        verbose_name_plural = "Motivos de Ausência"
+        verbose_name = "Motivo"
+        verbose_name_plural = "Motivos"
 
 
 class Filial(models.Model): # <-- MOVIMENTO PARA CÁ E ALINHADA CORRETAMENTE
@@ -65,9 +80,10 @@ class Filial(models.Model): # <-- MOVIMENTO PARA CÁ E ALINHADA CORRETAMENTE
 class Colaborador(models.Model):
     # Campos para Carga em Massa
     nome = models.CharField(max_length=200)
-    cpf = models.CharField(max_length=20, unique=True)
+    cpf = models.CharField(max_length=20, unique=True, validators=[validar_cpf])
     departamento = models.CharField(max_length=100, blank=True)
     empresa = models.CharField(max_length=100, blank=True)  # Texto simples para facilitar importação excel
+    filial = models.ForeignKey('Filial', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Filial")
 
     def __str__(self):
         return self.nome
@@ -75,6 +91,29 @@ class Colaborador(models.Model):
     class Meta:
         verbose_name = "Colaborador"
         verbose_name_plural = "Colaboradores"
+
+
+class ColaboradorInfo(models.Model):
+    TIPO_PIX_CHOICES = [
+        ('CPF', 'CPF'),
+        ('TELEFONE', 'Telefone'),
+        ('EMAIL', 'E-mail'),
+        ('ALEATORIA', 'Chave Aleatória'),
+        ('BANCO', 'Dados Bancários'),
+    ]
+    nome = models.CharField(max_length=200, verbose_name="Nome Completo")
+    cpf = models.CharField(max_length=20, verbose_name="CPF", validators=[validar_cpf])
+    tipo_pix = models.CharField(max_length=10, choices=TIPO_PIX_CHOICES, blank=True, verbose_name="Tipo de Chave")
+    chave_pix = models.CharField(max_length=200, blank=True, verbose_name="Chave Pix / Dados Bancários")
+    observacoes = models.TextField(blank=True, verbose_name="Observações")
+
+    def __str__(self):
+        return self.nome.upper()
+
+    class Meta:
+        verbose_name = "Cad. Folguista"
+        verbose_name_plural = "Cad. Folguistas"
+        ordering = ['nome']
 
 
 class Tomador(models.Model):

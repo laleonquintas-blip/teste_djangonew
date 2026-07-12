@@ -1,6 +1,6 @@
 # financeiro/models.py
 
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.contrib import messages
 from datetime import date
@@ -35,7 +35,7 @@ class Sequencial(models.Model):
 
 
 class ContasAPagar(models.Model):
-    fornecedor = models.ForeignKey(Fornecedor, on_delete=models.PROTECT, verbose_name="Fornecedor")
+    fornecedor = models.ForeignKey(Fornecedor, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Fornecedor")
     empresa_pagadora = models.ForeignKey(Empresa, on_delete=models.PROTECT, verbose_name="Empresa Pagadora")
     banco = models.ForeignKey(Banco, on_delete=models.PROTECT, verbose_name="Banco de Pagamento")
     data_emissao = models.DateField(verbose_name="Data de Emissão")
@@ -86,6 +86,10 @@ class ContasAPagar(models.Model):
     status_visual.admin_order_field = 'vencimento'
 
     def save(self, request=None, *args, **kwargs):
+        with transaction.atomic():
+            self._save_logic(request, *args, **kwargs)
+
+    def _save_logic(self, request=None, *args, **kwargs):
         if not self.nota:
             contador, created = Sequencial.objects.get_or_create(prefixo='CP', defaults={'ultimo_numero': 0})
             contador.ultimo_numero += 1
@@ -95,33 +99,96 @@ class ContasAPagar(models.Model):
                 messages.success(request, f"SUCESSO! Conta a Pagar criada: {self.nota}")
         if self.status == 'PAGO' and not self.data_baixa:
             self.data_baixa = date.today()
+        # Detecta mudança de status para comparação
+        status_anterior = None
+        if self.pk:
+            try:
+                status_anterior = ContasAPagar.objects.get(pk=self.pk).status
+            except ContasAPagar.DoesNotExist:
+                pass
+
         # Crédito automático no saldo do supervisor quando CP é pago
-        if self.status == 'PAGO' and self.supervisor_id:
-            if self.pk:
-                try:
-                    anterior = ContasAPagar.objects.get(pk=self.pk)
-                    status_mudou = anterior.status != 'PAGO'
-                except ContasAPagar.DoesNotExist:
-                    status_mudou = True
-            else:
-                status_mudou = True
-            if status_mudou:
-                saldo_sup = SaldoSupervisor.objects.filter(
-                    supervisor_id=self.supervisor_id, status='ABERTO'
-                ).order_by('-data_inicio').first()
-                if not saldo_sup:
-                    supervisor = UsuarioCustomizado.objects.get(pk=self.supervisor_id)
-                    saldo_sup = SaldoSupervisor.objects.create(supervisor=supervisor)
-                saldo_sup.saldo_disponivel += self.valor
-                saldo_sup.save()
-                MovimentacaoSupervisor.objects.create(
-                    saldo_supervisor=saldo_sup,
-                    tipo='CREDITO',
-                    valor=self.valor,
-                    descricao=f"CP {self.nota} — {self.fornecedor}",
-                    referencia_cp=self if self.pk else None,
+        credito_pendente = None
+        if self.status == 'PAGO' and self.supervisor_id and status_anterior != 'PAGO':
+            saldo_sup = SaldoSupervisor.objects.filter(
+                supervisor_id=self.supervisor_id, status='ABERTO'
+            ).order_by('-data_inicio').first()
+            if not saldo_sup:
+                supervisor = UsuarioCustomizado.objects.get(pk=self.supervisor_id)
+                saldo_sup = SaldoSupervisor.objects.create(supervisor=supervisor)
+            # F() garante atualização atômica (evita race condition em multithread)
+            SaldoSupervisor.objects.filter(pk=saldo_sup.pk).update(
+                saldo_disponivel=models.F('saldo_disponivel') + self.valor
+            )
+            saldo_sup.refresh_from_db()
+            credito_pendente = saldo_sup
+
+        # Estorno do crédito quando CP sai do status PAGO (volta p/ PENDENTE ou similar)
+        if status_anterior == 'PAGO' and self.status not in ('PAGO', 'CANCELADO') and self.supervisor_id:
+            mov = MovimentacaoSupervisor.objects.filter(referencia_cp=self).first()
+            if mov:
+                saldo_sup = mov.saldo_supervisor
+                SaldoSupervisor.objects.filter(pk=saldo_sup.pk).update(
+                    saldo_disponivel=models.F('saldo_disponivel') - mov.valor
                 )
+                mov.delete()
+                # Se o ciclo ficou sem movimentações, remove para não bloquear novo crédito
+                if not saldo_sup.movimentacoes.exists():
+                    saldo_sup.delete()
+
+        # Cancelamento: cancela o SaldoSupervisor vinculado se não tiver débitos
+        if self.status == 'CANCELADO' and self.supervisor_id and status_anterior not in (None, 'CANCELADO'):
+            # Usa sempre o FK direto — nunca fallback por supervisor (risco de atingir ciclo errado)
+            mov = MovimentacaoSupervisor.objects.filter(referencia_cp=self).first()
+            if mov:
+                saldo_sup = mov.saldo_supervisor
+                tem_debitos = saldo_sup.movimentacoes.filter(tipo='DEBITO').exists()
+                if not tem_debitos:
+                    saldo_sup.movimentacoes.all().delete()
+                    saldo_sup.saldo_disponivel = 0
+                    saldo_sup.status = 'CANCELADO'
+                    saldo_sup.save()
+
         super().save(*args, **kwargs)
+
+        # Cria a movimentação de crédito APÓS o super().save() (self.pk garantido)
+        if credito_pendente:
+            MovimentacaoSupervisor.objects.create(
+                saldo_supervisor=credito_pendente,
+                tipo='CREDITO',
+                valor=self.valor,
+                descricao=f"CP {self.nota} — {self.fornecedor}",
+                referencia_cp=self,
+            )
+
+    def delete(self, *args, **kwargs):
+        # Estorna o crédito no saldo do supervisor ao excluir um CP pago com supervisor
+        if self.supervisor_id:
+            mov = MovimentacaoSupervisor.objects.filter(referencia_cp=self).first()
+            if mov:
+                saldo_sup = mov.saldo_supervisor
+                if saldo_sup.movimentacoes.filter(tipo='DEBITO').exists():
+                    raise ValueError(
+                        f"Não é possível excluir este lançamento: o saldo do supervisor "
+                        f"{saldo_sup.supervisor.first_name} ({saldo_sup.numero}) "
+                        f"já possui utilizações registradas."
+                    )
+                saldo_sup.saldo_disponivel -= mov.valor
+                saldo_sup.save()
+                mov.delete()
+                if not saldo_sup.movimentacoes.exists():
+                    saldo_sup.delete()
+            else:
+                # Movimentação já foi removida (ex: CP voltou p/ PENDENTE antes de ser excluído)
+                # Limpa SS órfão com saldo zero e sem débitos vinculado a este supervisor
+                ss_orfao = SaldoSupervisor.objects.filter(
+                    supervisor_id=self.supervisor_id,
+                    status='ABERTO',
+                    saldo_disponivel=0,
+                ).filter(movimentacoes__isnull=True).first()
+                if ss_orfao:
+                    ss_orfao.delete()
+        super().delete(*args, **kwargs)
 
     class Meta:
         verbose_name = "Conta a Pagar"
@@ -318,6 +385,7 @@ class SaldoSupervisor(models.Model):
     STATUS_CHOICES = [
         ('ABERTO', 'Aberto'),
         ('FECHADO', 'Fechado'),
+        ('CANCELADO', 'Cancelado'),
     ]
     numero = models.CharField(max_length=12, unique=True, blank=True, verbose_name="Nº")
     supervisor = models.ForeignKey(

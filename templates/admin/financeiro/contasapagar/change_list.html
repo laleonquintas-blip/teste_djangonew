@@ -67,7 +67,7 @@
 
     </div>
     <div class="cfb-actions" style="margin-top:10px;">
-        <button class="cfb-btn cfb-btn-search" onclick="cfbApply({
+        <button type="button" class="cfb-btn cfb-btn-search" onclick="cfbApply({
             nota_q: cfbVal('cfb_nota'),
             forn_q: cfbVal('cfb_forn'),
             'vencimento__range__gte': cfbVal('cfb_venc_ini'),
@@ -77,7 +77,7 @@
             status_real: cfbVal('cfb_status'),
             empresa_pagadora: cfbVal('cfb_empresa')
         })">🔍 Pesquisar</button>
-        <button class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
+        <button type="button" class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
     </div>
     <div style="margin-top:10px;padding:8px 12px;background:#fff3cd;border:1px solid #ffc107;border-radius:5px;display:inline-flex;align-items:center;gap:8px;">
         <i class="fas fa-calculator" style="color:#856404;"></i>

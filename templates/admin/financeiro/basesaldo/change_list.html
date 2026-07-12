@@ -69,7 +69,7 @@
 
     </div>
     <div class="cfb-actions" style="margin-top:10px;">
-        <button class="cfb-btn cfb-btn-search" onclick="cfbApply({
+        <button type="button" class="cfb-btn cfb-btn-search" onclick="cfbApply({
             'data_baixa__range__gte': cfbVal('cfb_baixa_ini'),
             'data_baixa__range__lte': cfbVal('cfb_baixa_fim'),
             nome_q:    cfbVal('cfb_nome'),
@@ -78,7 +78,7 @@
             origem:    cfbVal('cfb_origem'),
             usuario_q: cfbVal('cfb_usuario')
         })">🔍 Pesquisar</button>
-        <button class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
+        <button type="button" class="cfb-btn cfb-btn-clear" onclick="cfbClear()">✕ Limpar</button>
     </div>
 </div>
 
