@@ -1,6 +1,29 @@
 {% extends "admin/change_form.html" %}
 {% load static %}
 
+{% block content %}
+{% if alerta_duplicidade %}
+<div style="
+    background:#fff3cd;border:2px solid #ffc107;border-radius:8px;
+    padding:14px 18px;margin-bottom:18px;display:flex;align-items:flex-start;gap:12px;
+">
+    <span style="font-size:22px;line-height:1;">⚠️</span>
+    <div>
+        <strong style="color:#856404;font-size:14px;">Atenção: possível pagamento em duplicidade</strong><br>
+        <span style="color:#856404;font-size:13px;">
+            Foram encontradas solicitações para o mesmo colaborador e filial nos últimos 7 dias.
+            Verifique antes de prosseguir:
+            {% for wf_id in alerta_duplicidade %}
+                <a href="{% url 'admin:workflow_despesa_change' wf_id %}" target="_blank"
+                   style="font-weight:bold;color:#856404;text-decoration:underline;">WF#{{ wf_id }}</a>{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        </span>
+    </div>
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}
+
 {% block extrahead %}
     {{ block.super }}
 
@@ -215,5 +238,47 @@
             verificarMotivoCancelamento();
             verificarJustificativa();
         });
+    </script>
+
+    <script>
+    // Botão "Novo Colaborador" ao lado do campo Quem Cobriu
+    function injetarBtnColaboradorInfo() {
+        // Aborta se o campo não existe na página (CAIXINHA/EXTRA) ou botão já existe
+        if (!document.getElementById('id_colaborador_info')) return;
+        if (document.getElementById('btn-add-colab-info')) return;
+
+        // Oculta botões padrão do Django (lápis, X, olho, +)
+        document.querySelectorAll('[id^="change_id_colaborador_info"],[id^="add_id_colaborador_info"],[id^="delete_id_colaborador_info"],[id^="view_id_colaborador_info"]').forEach(function(el) {
+            el.style.display = 'none';
+        });
+
+        // Cria botão
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'btn-add-colab-info';
+        btn.textContent = '➕ Novo Colaborador';
+        btn.style.cssText = 'margin-top:6px;padding:5px 14px;font-size:12px;font-weight:bold;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;display:block;';
+        btn.onclick = function() {
+            window.open(
+                '/admin/cadastros/colaboradorinfo/add/?_popup=1',
+                'add_colaboradorinfo',
+                'width=700,height=500,resizable=yes,scrollbars=yes,left=200,top=100'
+            );
+        };
+
+        // Insere após o wrapper do select
+        var wrapper = document.querySelector('[data-model-ref="colaboradorinfo"]');
+        if (wrapper && wrapper.parentNode) {
+            wrapper.parentNode.insertBefore(btn, wrapper.nextSibling);
+        }
+    }
+
+    // Executa quando DOM pronto e também após 1s (garante que Jazzmin/Select2 terminou)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', injetarBtnColaboradorInfo);
+    } else {
+        injetarBtnColaboradorInfo();
+    }
+    setTimeout(injetarBtnColaboradorInfo, 1000);
     </script>
 {% endblock %}

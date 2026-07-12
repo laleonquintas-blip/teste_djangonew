@@ -513,7 +513,11 @@ class DespesaAdmin(admin.ModelAdmin):
         'CANCELADO': '#c0392b'
     }
 
+    _DISPLAY_ONLY_FIELDS = {'dialogo_display', 'folha_resumo_display', 'itens_folha_display'}
+
     def get_form(self, request, obj=None, **kwargs):
+        if 'fields' in kwargs:
+            kwargs['fields'] = [f for f in kwargs['fields'] if f not in self._DISPLAY_ONLY_FIELDS]
         form = super().get_form(request, obj, **kwargs)
         for field in form.base_fields.values():
             if hasattr(field.widget, 'can_add_related'):
@@ -567,11 +571,16 @@ class DespesaAdmin(admin.ModelAdmin):
 
     # --- CAMPOS TRAVADOS (READONLY) ---
     def get_readonly_fields(self, request, obj=None):
-        ro_fields = ['tipo_lancamento', 'data_ultima_alteracao', 'dialogo_display']
+        ro_fields = ['tipo_lancamento', 'data_ultima_alteracao', 'dialogo_display',
+                     'folha_resumo_display', 'itens_folha_display']
 
         # Novo registro para usuário comum: status é auto-definido, exibe só-leitura
         if not obj and not request.user.is_superuser:
             ro_fields.append('status')
+            # Para FOLHA no add form, o valor vem da folha — não deve ser editável
+            tipo_post = request.POST.get('tipo_lancamento') or request.GET.get('tipo_lancamento', '')
+            if tipo_post == 'FOLHA':
+                ro_fields.append('valor')
             return ro_fields
 
         if obj:
@@ -579,7 +588,10 @@ class DespesaAdmin(admin.ModelAdmin):
             grupos = list(user.groups.values_list('name', flat=True))
 
             if user.is_superuser:
-                return ['dialogo_display']  # campo calculado, sempre readonly
+                base = ['dialogo_display']
+                if obj and obj.tipo_lancamento == 'FOLHA':
+                    base += ['folha_resumo_display', 'itens_folha_display', 'valor']
+                return base
 
             if not self.has_change_permission(request, obj):
                 return [f.name for f in self.model._meta.fields]
@@ -634,6 +646,14 @@ class DespesaAdmin(admin.ModelAdmin):
                 'dados_bancarios_pagto',
                 'observacoes'
             )
+        elif tipo == 'FOLHA':
+            campos_lancamento = (
+                ('tipo_lancamento', 'data_despesa'),
+                'folha_resumo_display',
+                'valor',
+                'solicitante',
+                'observacoes',
+            )
         else:  # EXTRA
             campos_lancamento = (
                 'tipo_reserva',
@@ -653,6 +673,11 @@ class DespesaAdmin(admin.ModelAdmin):
                 'fields': campos_lancamento
             }),
         ]
+
+        if tipo == 'FOLHA' and obj:
+            fieldsets.append(('Colaboradores da Folha', {
+                'fields': ('itens_folha_display',),
+            }))
 
         if obj and obj.tipo_lancamento == 'EXTRA':
             fieldsets.append(('Definição de Pagamento (Administrativo)', {
@@ -905,6 +930,20 @@ class DespesaAdmin(admin.ModelAdmin):
 
         super().save_model(request, obj, form, change)
 
+        # Sincroniza status do PagamentoFolha com o WF
+        if obj.tipo_lancamento == 'FOLHA' and obj.pagamento_folha_id and change and 'status' in form.changed_data:
+            _mapa = {
+                'AGUARDANDO_RH':  'AGUARDANDO_RH',
+                'AGUARDANDO_FIN': 'AGUARDANDO_FIN',
+                'PAGO':           'PAGA',
+                'CONFERIDO':      'PAGA',
+                'CANCELADO':      'CANCELADA',
+            }
+            novo_status_pf = _mapa.get(obj.status)
+            if novo_status_pf:
+                from monitoramento_rh.models import PagamentoFolha as _PF
+                _PF.objects.filter(pk=obj.pagamento_folha_id).update(status=novo_status_pf)
+
         grupos = list(request.user.groups.values_list('name', flat=True))
         perfil = "Solicitante"
         if request.user.is_superuser:
@@ -959,8 +998,13 @@ class DespesaAdmin(admin.ModelAdmin):
                 partes_obs.append(f"Nome quem cobriu: {despesa.nome_cobriu}")
             if despesa.dados_bancarios_pagto:
                 partes_obs.append(f"Dados p/ pagamento: {despesa.dados_bancarios_pagto}")
+            is_folha = despesa.tipo_lancamento == 'FOLHA' and despesa.pagamento_folha
+            folha_obj = despesa.pagamento_folha.folha if is_folha else None
+            fornecedor = folha_obj.fornecedor if is_folha else despesa.fornecedor
+            plano = folha_obj.plano_de_contas if is_folha else (despesa.fornecedor.plano_de_contas if despesa.fornecedor else None)
+
             ContasAPagar.objects.create(
-                fornecedor=despesa.fornecedor,
+                fornecedor=fornecedor,
                 empresa_pagadora=despesa.empresa_pagadora,
                 banco=despesa.banco_pagador,
                 data_emissao=despesa.data_despesa,
@@ -971,7 +1015,7 @@ class DespesaAdmin(admin.ModelAdmin):
                 data_baixa=timezone.now().date(),
                 usuario_baixa=request.user,
                 observacoes=" | ".join(partes_obs),
-                plano_de_contas=despesa.fornecedor.plano_de_contas,
+                plano_de_contas=plano,
             )
 
     def registrar_utilizacao_supervisor(self, despesa, request):
@@ -1028,6 +1072,11 @@ class DespesaAdmin(admin.ModelAdmin):
         return response
 
     def despesa_display(self, obj):
+        if obj.tipo_lancamento == 'FOLHA':
+            try:
+                return str(obj.pagamento_folha.folha)
+            except Exception:
+                return obj.tomador.nome if obj.tomador else '—'
         if obj.tipo_lancamento == 'EXTRA' and obj.tomador:
             return obj.tomador.nome
         return obj.fornecedor.razao_social if obj.fornecedor else '-'
@@ -1036,6 +1085,103 @@ class DespesaAdmin(admin.ModelAdmin):
 
     def valor_formatado(self, obj):
         return f"R$ {obj.valor}"
+
+    def folha_resumo_display(self, obj):
+        try:
+            pag  = obj.pagamento_folha
+            folha = pag.folha
+            return mark_safe(
+                f'<strong>{folha}</strong><br>'
+                f'<small>Competência: {pag.data_inicio.strftime("%d/%m/%Y")} a {pag.data_fim.strftime("%d/%m/%Y")}</small><br>'
+                f'<small>Total: <strong>R$ {pag.total:,.2f}</strong></small>'.replace(',', 'X').replace('.', ',').replace('X', '.')
+            )
+        except Exception:
+            return '—'
+    folha_resumo_display.short_description = 'Folha'
+
+    def itens_folha_display(self, obj):
+        try:
+            itens = obj.pagamento_folha.itens.select_related('colaborador', 'colaborador__filial').order_by('colaborador__banco', 'colaborador__nome')
+        except Exception:
+            return '—'
+        if not itens.exists():
+            return 'Nenhum item.'
+
+        banco_atual = None
+        rows = []
+        subtotal = 0
+        total_geral = 0
+
+        for item in itens:
+            banco = item.colaborador.banco
+            td = 'style="padding:9px 16px;border-bottom:1px solid #e5e5e5;white-space:nowrap;"'
+            if banco != banco_atual:
+                if banco_atual is not None:
+                    sub_fmt = f'R$ {subtotal:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+                    rows.append(
+                        f'<tr style="background:#f5f5f5;font-weight:700;">'
+                        f'<td colspan="5" style="padding:8px 14px;text-align:right;color:#555;">Subtotal {banco_atual}</td>'
+                        f'<td style="padding:8px 14px;text-align:right;">{sub_fmt}</td>'
+                        f'<td style="padding:8px 14px;"></td></tr>'
+                    )
+                banco_atual = banco
+                subtotal = 0
+                rows.append(
+                    f'<tr style="background:#34495e;color:#fff;">'
+                    f'<td colspan="7" style="padding:10px 14px;font-weight:600;font-size:.9rem;">🏦 {banco}</td></tr>'
+                )
+
+            dif = ''
+            if item.valor_anterior is not None and item.valor_anterior != item.valor_atual:
+                ant_fmt = f'R$ {item.valor_anterior:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+                dif = f'<span style="color:#e74c3c;font-size:.82em;">⚠ ant: {ant_fmt}</span>'
+                if item.justificativa:
+                    dif += f'<br><em style="font-size:.78em;color:#888;">{item.justificativa}</em>'
+
+            val_fmt = f'R$ {item.valor_atual:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+            rows.append(
+                f'<tr style="background:#fff;">'
+                f'<td {td}>{item.colaborador.filial}</td>'
+                f'<td {td}>{item.colaborador.qt}</td>'
+                f'<td {td}>{item.colaborador.nome}</td>'
+                f'<td {td}>{item.colaborador.cpf}</td>'
+                f'<td {td}>Ag: {item.colaborador.agencia} &nbsp;|&nbsp; Cc: {item.colaborador.conta}</td>'
+                f'<td style="padding:9px 16px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:600;white-space:nowrap;">{val_fmt}</td>'
+                f'<td {td}>{dif}</td>'
+                f'</tr>'
+            )
+            subtotal    += item.valor_atual
+            total_geral += item.valor_atual
+
+        if banco_atual:
+            sub_fmt = f'R$ {subtotal:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+            rows.append(
+                f'<tr style="background:#f5f5f5;font-weight:700;">'
+                f'<td colspan="5" style="padding:8px 14px;text-align:right;color:#555;">Subtotal {banco_atual}</td>'
+                f'<td style="padding:8px 14px;text-align:right;">{sub_fmt}</td>'
+                f'<td style="padding:8px 14px;"></td></tr>'
+            )
+
+        tot_fmt = f'R$ {total_geral:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+        rows.append(
+            f'<tr style="background:#1a6e4a;color:#fff;font-weight:700;">'
+            f'<td colspan="5" style="padding:11px 14px;text-align:right;font-size:.92rem;letter-spacing:.03em;">TOTAL GERAL</td>'
+            f'<td style="padding:11px 14px;text-align:right;font-size:.95rem;">{tot_fmt}</td>'
+            f'<td style="padding:11px 14px;"></td></tr>'
+        )
+
+        th = 'style="padding:10px 16px;text-align:left;font-weight:600;letter-spacing:.03em;white-space:nowrap;"'
+        header = (
+            '<div style="position:relative;left:50%;transform:translateX(-50%);width:calc(100% + 200px);margin-bottom:-20px;overflow-x:auto;">'
+            '<table style="width:100%;border-collapse:collapse;font-size:.88rem;table-layout:auto;">'
+            f'<thead><tr style="background:#343a40;color:#fff;">'
+            f'<th {th}>Filial</th><th {th}>Qt</th><th {th}>Nome</th><th {th}>CPF</th>'
+            f'<th {th}>Ag / Conta</th><th {th} style="text-align:right;padding:10px 14px;">Valor</th>'
+            f'<th {th}>Diferença</th>'
+            '</tr></thead><tbody>'
+        )
+        return mark_safe(header + ''.join(rows) + '</tbody></table></div>')
+    itens_folha_display.short_description = ''
 
     valor_formatado.short_description = "Valor"
 
@@ -1052,17 +1198,25 @@ class DespesaAdmin(admin.ModelAdmin):
     status_badge.short_description = "Status"
 
     def tipo_badge(self, obj):
-        if obj.tipo_lancamento == 'CAIXINHA':
-            cor = '#34495e'
-        elif obj.tipo_lancamento == 'EXTRA':
-            cor = '#e67e22'
-        else:
-            cor = '#17a2b8'
+        cores = {
+            'CAIXINHA':   '#34495e',
+            'EXTRA':      '#e67e22',
+            'SOLICITACAO':'#17a2b8',
+            'FOLHA':      '#9b59b6',
+        }
+        labels = {
+            'CAIXINHA':   'Caixinha',
+            'EXTRA':      'Extra',
+            'SOLICITACAO':'Solicitação',
+            'FOLHA':      'Folha',
+        }
+        cor   = cores.get(obj.tipo_lancamento, '#17a2b8')
+        label = labels.get(obj.tipo_lancamento, obj.get_tipo_lancamento_display())
         style = (
             f'color:white; background-color:{cor}; padding:5px; border-radius:4px; '
             f'display: inline-block; width: 100px; text-align: center;'
         )
-        return mark_safe(f'<span style="{style}">{obj.get_tipo_lancamento_display()}</span>')
+        return mark_safe(f'<span style="{style}">{label}</span>')
 
     tipo_badge.short_description = "Tipo"
 

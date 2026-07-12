@@ -3,6 +3,7 @@ from collections import Counter
 from django.shortcuts import render
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Sum, F
+from django.http import JsonResponse
 from django.utils import timezone as tz
 
 
@@ -48,6 +49,7 @@ def relatorio_coberturas(request):
         .values(
             collab_id=F('colaborador_faltou__id'),
             nome=F('colaborador_faltou__nome'),
+            filial_nome=F('colaborador_faltou__filial__nome'),
         )
         .annotate(qtd=Count('id'), valor_total=Sum('valor'))
         .order_by('-qtd')
@@ -141,6 +143,164 @@ def relatorio_coberturas(request):
 
 @staff_member_required
 def painel_sla(request):
+    import datetime, calendar
+    from .models import Despesa, ConfiguracaoSLA, STATUS_WORKFLOW
+    from django.contrib import admin as dj_admin
+    from django.db.models import Count, F
+
+    STATUS_FINAIS     = {'PAGO', 'CONFERIDO', 'CANCELADO'}
+    STATUS_FINAIS_OK  = {'PAGO', 'CONFERIDO'}
+    STATUS_ABERTOS    = {'AGUARDANDO_COMERCIAL','AGUARDANDO_ADM','AGUARDANDO_RH','AGUARDANDO_FIN','DIRECIONADO_OP'}
+    STATUS_APROVADOR  = {
+        'AGUARDANDO_COMERCIAL': 'Comercial',
+        'AGUARDANDO_ADM':       'Administrativo',
+        'AGUARDANDO_RH':        'RH',
+        'AGUARDANDO_FIN':       'Financeiro',
+        'DIRECIONADO_OP':       'Operador',
+    }
+
+    agora = tz.now()
+    hoje  = agora.date()
+
+    # ── Período selecionado (default = mês atual até hoje) ──────────────
+    filtro_tipo = request.GET.get('tipo', '')
+    filtro_de   = request.GET.get('data_de', '')
+    filtro_ate  = request.GET.get('data_ate', '')
+
+    data_inicio = datetime.date.fromisoformat(filtro_de)  if filtro_de  else hoje.replace(day=1)
+    data_fim    = datetime.date.fromisoformat(filtro_ate) if filtro_ate else hoje
+
+    # Mesmo período do mês anterior
+    m_ant  = data_inicio.month - 1 or 12
+    a_ant  = data_inicio.year - (1 if data_inicio.month == 1 else 0)
+    max_d  = calendar.monthrange(a_ant, m_ant)[1]
+    data_inicio_ant = data_inicio.replace(year=a_ant, month=m_ant)
+    data_fim_ant    = data_fim.replace(   year=a_ant, month=m_ant, day=min(data_fim.day, max_d))
+
+    # ── SLA config ───────────────────────────────────────────────────────
+    sla_map    = {s.status: s.total_horas for s in ConfiguracaoSLA.objects.filter(ativo=True)}
+    soma_sla_h = sum(sla_map.values()) if sla_map else None
+
+    # ── Helpers ──────────────────────────────────────────────────────────
+    def horas_vida(d):
+        fim = d.data_ultima_alteracao if d.status in STATUS_FINAIS_OK else agora
+        if not d.data_criacao:
+            return 0
+        return (fim - d.data_criacao).total_seconds() / 3600
+
+    def dentro_sla(d):
+        if soma_sla_h is None:
+            return True
+        return horas_vida(d) <= soma_sla_h
+
+    def pct_delta(atual, ant):
+        if ant == 0:
+            return None
+        return round((atual - ant) / ant * 100, 1)
+
+    # ── Base QS ──────────────────────────────────────────────────────────
+    qs_all = Despesa.objects.select_related('solicitante', 'motivo_ausencia')
+    if filtro_tipo:
+        qs_all = qs_all.filter(tipo_lancamento=filtro_tipo)
+
+    def metrics(qs):
+        lst = list(qs)
+        total      = len(lst)
+        abertos    = sum(1 for d in lst if d.status in STATUS_ABERTOS)
+        atendidos  = sum(1 for d in lst if d.status in STATUS_FINAIS_OK and dentro_sla(d))
+        extrapol   = sum(1 for d in lst if not dentro_sla(d))
+        return total, abertos, atendidos, extrapol
+
+    qs_per = qs_all.filter(data_criacao__date__gte=data_inicio,     data_criacao__date__lte=data_fim)
+    qs_ant = qs_all.filter(data_criacao__date__gte=data_inicio_ant, data_criacao__date__lte=data_fim_ant)
+
+    tot,  ab,  atd,  ext  = metrics(qs_per)
+    tot_a, ab_a, atd_a, ext_a = metrics(qs_ant)
+
+    cards = {
+        'aberto':      {'v': ab,  'ant': ab_a,  'delta': pct_delta(ab,  ab_a),  'icon':'fas fa-clock',        'cor':'#e67e22'},
+        'total':       {'v': tot, 'ant': tot_a, 'delta': pct_delta(tot, tot_a), 'icon':'fas fa-layer-group',  'cor':'#8e44ad'},
+        'atendido':    {'v': atd, 'ant': atd_a, 'delta': pct_delta(atd, atd_a), 'icon':'fas fa-check-circle', 'cor':'#27ae60'},
+        'extrapolado': {'v': ext, 'ant': ext_a, 'delta': pct_delta(ext, ext_a), 'icon':'fas fa-hourglass-end','cor':'#e74c3c'},
+    }
+
+    pct_sla_gauge = round(atd / tot * 100) if tot else 0
+
+    # ── Gráfico 1: Em aberto por motivo ──────────────────────────────────
+    qs_aberto = qs_per.filter(status__in=STATUS_ABERTOS)
+    _motivo_count = {}
+    for d in qs_aberto.select_related('motivo_ausencia'):
+        nome = (d.motivo_ausencia.nome if d.motivo_ausencia_id
+                else d.get_tipo_lancamento_display().upper())
+        _motivo_count[nome] = _motivo_count.get(nome, 0) + 1
+    aberto_por_motivo = [
+        {'nome': k, 'qtd': v}
+        for k, v in sorted(_motivo_count.items(), key=lambda x: -x[1])
+    ][:12]
+
+    # ── Gráfico 2: Em aberto por aprovador (status) ──────────────────────
+    aprov_raw = (
+        qs_aberto
+        .values('status')
+        .annotate(qtd=Count('id'))
+        .order_by('-qtd')
+    )
+    aberto_por_aprovador = [
+        {'nome': STATUS_APROVADOR.get(r['status'], r['status']), 'qtd': r['qtd']}
+        for r in aprov_raw
+    ]
+
+    # ── Gráfico 3: SLA atendido por solicitante ───────────────────────────
+    atd_user = {}
+    for d in qs_per:
+        if d.status in STATUS_FINAIS_OK and dentro_sla(d):
+            nome = d.solicitante.get_full_name() or d.solicitante.username
+            atd_user[nome] = atd_user.get(nome, 0) + 1
+    atd_por_usuario = sorted(atd_user.items(), key=lambda x: -x[1])[:10]
+    atd_por_usuario = [{'nome': k, 'qtd': v} for k, v in atd_por_usuario]
+
+    # ── Gráfico 4: SLA extrapolado por motivo ────────────────────────────
+    ext_motivo = {}
+    for d in qs_per:
+        if not dentro_sla(d):
+            nome = (d.motivo_ausencia.nome if d.motivo_ausencia_id
+                    else d.get_tipo_lancamento_display())
+            ext_motivo[nome] = ext_motivo.get(nome, 0) + 1
+    ext_por_motivo = sorted(ext_motivo.items(), key=lambda x: -x[1])[:12]
+    ext_por_motivo = [{'nome': k, 'qtd': v} for k, v in ext_por_motivo]
+
+    # max para escala das barras
+    def _max(lst): return max((r['qtd'] for r in lst), default=1)
+
+    context = {
+        **dj_admin.site.each_context(request),
+        'title': 'SLA de Atendimento',
+        'cards': cards,
+        'pct_sla_gauge':      pct_sla_gauge,
+        'aberto_por_motivo':  aberto_por_motivo,
+        'max_motivo':         _max(aberto_por_motivo),
+        'aberto_por_aprov':   aberto_por_aprovador,
+        'max_aprov':          _max(aberto_por_aprovador),
+        'atd_por_usuario':    atd_por_usuario,
+        'max_usuario':        _max(atd_por_usuario),
+        'ext_por_motivo':     ext_por_motivo,
+        'max_ext':            _max(ext_por_motivo),
+        'data_inicio':        data_inicio,
+        'data_fim':           data_fim,
+        'data_inicio_ant':    data_inicio_ant,
+        'data_fim_ant':       data_fim_ant,
+        'filtro_tipo':        filtro_tipo,
+        'filtro_de':          filtro_de,
+        'filtro_ate':         filtro_ate,
+        'tipo_choices':       [('CAIXINHA','Caixinha'),('SOLICITACAO','Solicitação'),('EXTRA','Extra')],
+        'sem_sla':            not sla_map,
+    }
+    return render(request, 'admin/workflow/painel_sla.html', context)
+
+
+# ── versão tabela detalhada (mantida para acesso direto) ─────────────────────
+@staff_member_required
+def painel_sla_tabela(request):
     from .models import Despesa, ConfiguracaoSLA, LogWorkflow, STATUS_WORKFLOW
     from django.contrib import admin as dj_admin
 
@@ -172,10 +332,142 @@ def painel_sla(request):
     if filtro_ate:
         qs = qs.filter(data_criacao__date__lte=filtro_ate)
 
+    # Mapa de ações → status que o WF ENTRA após aquela ação
+    ACAO_PARA_STATUS = {
+        'Aprovou → RH':              'AGUARDANDO_RH',
+        'Aprovou → Financeiro':      'AGUARDANDO_FIN',
+        'Direcionou ao Operador':    'DIRECIONADO_OP',
+        'Retornou ao Administrativo':'AGUARDANDO_ADM',
+        'Devolveu ao Financeiro':    'AGUARDANDO_FIN',
+        'FINALIZOU (PAGO)':          'PAGO',
+        'CONFERIDO':                 'CONFERIDO',
+        'CANCELOU':                  'CANCELADO',
+    }
+
+    # Status em que o WF estava ANTES de cada ação de transição
+    ACAO_STATUS_ANTERIOR = {
+        'Aprovou → RH':              'AGUARDANDO_ADM',
+        'Aprovou → Financeiro':      'AGUARDANDO_RH',
+        'Direcionou ao Operador':    'AGUARDANDO_FIN',
+        'Retornou ao Administrativo':'AGUARDANDO_RH',
+        'Devolveu ao Financeiro':    'DIRECIONADO_OP',
+        'FINALIZOU (PAGO)':          'DIRECIONADO_OP',
+        'CONFERIDO':                 'AGUARDANDO_FIN',
+        'CANCELOU':                  None,
+    }
+
+    # Status inicial padrão por tipo (quando não há como inferir)
+    TIPO_STATUS_INICIAL = {
+        'CAIXINHA':   'AGUARDANDO_FIN',
+        'SOLICITACAO':'AGUARDANDO_RH',
+        'EXTRA':      'AGUARDANDO_FIN',
+    }
+
+    # Etapas que nos interessam exibir, em ordem de fluxo
+    ETAPAS_EXIBIR = [
+        ('AGUARDANDO_ADM', 'ADM', '#3498db'),
+        ('AGUARDANDO_RH',  'RH',  '#27ae60'),
+        ('AGUARDANDO_FIN', 'FIN', '#f39c12'),
+        ('DIRECIONADO_OP', 'OP',  '#8e44ad'),
+        ('AGUARDANDO_COMERCIAL', 'COM', '#16a085'),
+    ]
+
+    def _fmt_horas_curto(h):
+        total_min = int(round(h * 60))
+        dias, resto = divmod(total_min, 1440)
+        horas, minutos = divmod(resto, 60)
+        if dias:
+            return f"{dias}d{horas}h" if horas else f"{dias}d"
+        elif horas:
+            return f"{horas}h{minutos:02d}m" if minutos else f"{horas}h"
+        return f"{minutos}m"
+
+    # De qual status o WF vinha antes de cada ação (usando perfil do executor como hint)
+    PERFIL_STATUS_ORIGEM = {
+        'RH':          'AGUARDANDO_RH',
+        'Financeiro':  'AGUARDANDO_FIN',
+        'Operador':    'DIRECIONADO_OP',
+        'Administrativo': None,  # ambíguo — usa tipo
+        'Admin':       None,
+        'Solicitante': None,
+    }
+
+    def _inferir_status_anterior(log, tipo_lancamento):
+        """Infere o status em que o WF estava ANTES de 'Retornou ao Administrativo'."""
+        st = PERFIL_STATUS_ORIGEM.get(log.perfil_usuario)
+        if st:
+            return st
+        return TIPO_STATUS_INICIAL.get(tipo_lancamento, 'AGUARDANDO_FIN')
+
+    def calcular_tempo_por_etapa(despesa, logs_ordenados, agora):
+        """Retorna dict {status: horas} com tempo acumulado em cada etapa."""
+        tempos = {}
+
+        # Determinar status inicial a partir da primeira ação de transição
+        primeiro_log_transicao = next(
+            (log for log in logs_ordenados if log.acao in ACAO_PARA_STATUS), None
+        )
+        if primeiro_log_transicao:
+            acao = primeiro_log_transicao.acao
+            if acao == 'Retornou ao Administrativo':
+                # Usa perfil do executor para saber de onde voltou
+                status_atual = _inferir_status_anterior(primeiro_log_transicao, despesa.tipo_lancamento)
+            elif ACAO_STATUS_ANTERIOR.get(acao):
+                status_atual = ACAO_STATUS_ANTERIOR[acao]
+            else:
+                status_atual = TIPO_STATUS_INICIAL.get(despesa.tipo_lancamento, 'AGUARDANDO_RH')
+        else:
+            # Sem transições: WF permanece no status atual desde a criação
+            status_atual = despesa.status if despesa.status not in STATUS_FINAIS \
+                           else TIPO_STATUS_INICIAL.get(despesa.tipo_lancamento, 'AGUARDANDO_RH')
+
+        # Fallback de entrada: data_criacao do registro quando não há "Criou Registro" no log
+        entrada = despesa.data_criacao
+
+        for log in logs_ordenados:
+            if log.acao == 'Criou Registro':
+                entrada = log.data_hora
+                continue
+            novo_status = ACAO_PARA_STATUS.get(log.acao)
+            if novo_status:
+                if entrada and log.data_hora > entrada:
+                    horas = (log.data_hora - entrada).total_seconds() / 3600
+                    tempos[status_atual] = tempos.get(status_atual, 0) + horas
+                status_atual = novo_status
+                entrada = log.data_hora
+
+        # Período atual ainda em aberto
+        if entrada and status_atual not in STATUS_FINAIS:
+            horas = (agora - entrada).total_seconds() / 3600
+            tempos[status_atual] = tempos.get(status_atual, 0) + horas
+
+        return tempos
+
+    def fmt_etapas(tempos):
+        """Retorna lista de dicts para renderizar a barra de timeline por etapa."""
+        total_h = sum(tempos.values()) or 1
+        partes = []
+        for st, label, cor in ETAPAS_EXIBIR:
+            h = tempos.get(st, 0)
+            if h < 0.01:
+                continue
+            pct = round(h / total_h * 100, 1)
+            partes.append({
+                'label': label,
+                'txt': _fmt_horas_curto(h),
+                'cor': cor,
+                'pct': pct,
+            })
+        return partes
+
     resultados = []
     contadores = {'NO_PRAZO': 0, 'A_VENCER': 0, 'EM_ATRASO': 0, 'FECHADO_ATRASO': 0, 'FECHADO_OK': 0}
 
     for despesa in qs:
+        logs_ord = sorted(despesa.logs.all(), key=lambda l: l.data_hora)
+        tempo_etapas = calcular_tempo_por_etapa(despesa, logs_ord, agora)
+        etapas_fmt = fmt_etapas(tempo_etapas)
+
         status_atual = despesa.status
         is_final = status_atual in STATUS_FINAIS
 
@@ -240,6 +532,7 @@ def painel_sla(request):
             'excesso_fmt': fmt_horas(excesso_h) if excesso_h else '',
             'status_label': STATUS_LABELS.get(status_atual, status_atual),
             'is_final': is_final,
+            'etapas_fmt': etapas_fmt,
         })
 
     # Ordena: em atraso primeiro, depois a vencer, etc.
@@ -270,4 +563,24 @@ def painel_sla(request):
         'sla_map': sla_map,
         'sem_sla': not sla_map,
     }
-    return render(request, 'admin/workflow/painel_sla.html', context)
+    return render(request, 'admin/workflow/painel_sla_tabela.html', context)
+
+
+@staff_member_required
+def api_colaborador_info(request):
+    from cadastros.models import ColaboradorInfo
+    pk = request.GET.get('id')
+    if not pk:
+        return JsonResponse({'error': 'id required'}, status=400)
+    try:
+        c = ColaboradorInfo.objects.get(pk=pk)
+        linhas = []
+        if c.chave_pix:
+            tipo = c.get_tipo_pix_display() if c.tipo_pix else 'Pix'
+            linhas.append(f"{tipo}: {c.chave_pix}")
+        if c.cpf and c.tipo_pix != 'CPF':
+            linhas.append(f"CPF: {c.cpf}")
+        dados = '\n'.join(linhas)
+        return JsonResponse({'nome': c.nome.upper(), 'dados': dados})
+    except ColaboradorInfo.DoesNotExist:
+        return JsonResponse({'error': 'not found'}, status=404)

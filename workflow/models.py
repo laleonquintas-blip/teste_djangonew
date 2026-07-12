@@ -2,7 +2,7 @@
 from django.db import models
 from django.utils import timezone
 from core.models import UsuarioCustomizado
-from cadastros.models import Fornecedor, Empresa, Banco, Tomador, Filial, MotivoAusencia, Colaborador
+from cadastros.models import Fornecedor, Empresa, Banco, Tomador, Filial, MotivoAusencia, Colaborador, ColaboradorInfo
 
 STATUS_WORKFLOW = [
     ('AGUARDANDO_COMERCIAL', 'Aguardando Comercial'),
@@ -16,9 +16,10 @@ STATUS_WORKFLOW = [
 ]
 
 TIPO_LANCAMENTO_CHOICES = [
-    ('CAIXINHA', 'Caixinha'),
-    ('SOLICITACAO', 'Solicitação'),
-    ('EXTRA', 'Extra'),
+    ('CAIXINHA',   'Caixinha'),
+    ('SOLICITACAO','Solicitação'),
+    ('EXTRA',      'Extra'),
+    ('FOLHA',      'Folha de Pagamento'),
 ]
 
 FORMA_PAGTO_CHOICES = [
@@ -32,7 +33,11 @@ class Despesa(models.Model):
     tipo_lancamento = models.CharField(max_length=20, choices=TIPO_LANCAMENTO_CHOICES, default='CAIXINHA',
                                        verbose_name="Tipo")
     data_despesa = models.DateField(default=timezone.now, verbose_name="Data da Despesa")
-    fornecedor = models.ForeignKey(Fornecedor, on_delete=models.PROTECT, verbose_name="Despesa")
+    fornecedor = models.ForeignKey(Fornecedor, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Despesa")
+    pagamento_folha = models.OneToOneField(
+        'monitoramento_rh.PagamentoFolha', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='despesa_wf', verbose_name='Pagamento de Folha'
+    )
     valor = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor (R$)")
     observacoes = models.TextField(blank=True, verbose_name="Observações")
     solicitante = models.ForeignKey(UsuarioCustomizado, on_delete=models.PROTECT, related_name='solicitacoes',
@@ -57,6 +62,10 @@ class Despesa(models.Model):
                                            related_name='faltas_workflow', verbose_name="Quem Faltou")
 
     # DEFINIÇÃO DE PAGAMENTO (ADMINISTRATIVO)
+    colaborador_info = models.ForeignKey(
+        ColaboradorInfo, on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="Quem Cobriu", related_name='solicitacoes'
+    )
     nome_cobriu = models.CharField(max_length=150, blank=True, null=True, verbose_name="Nome de Quem Cobriu")
     forma_pagamento = models.CharField(max_length=10, choices=FORMA_PAGTO_CHOICES, blank=True, null=True,
                                        verbose_name="Forma Pagamento")

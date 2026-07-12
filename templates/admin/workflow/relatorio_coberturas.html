@@ -1,0 +1,303 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static humanize %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .card-dashboard {
+        border-radius: 10px;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        background: white;
+        overflow: hidden;
+    }
+    .card-header-custom {
+        padding: 12px 18px;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+    }
+    .card-body-custom { padding: 20px; }
+    .big-number { font-size: 1.8rem; font-weight: 800; margin-bottom: 0; }
+    .text-small { font-size: 0.8rem; opacity: 0.8; }
+    .border-left-primary { border-left: 5px solid #4e73df; }
+    .border-left-warning { border-left: 5px solid #f6c23e; }
+    .border-left-info    { border-left: 5px solid #36b9cc; }
+    .filter-card {
+        background: #f8f9fc;
+        border: 1px solid #e3e6f0;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    .table th { background: #f1f3fb; }
+    .pct-bar {
+        height: 8px;
+        border-radius: 4px;
+        background: #4e73df;
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    /* Linha clicável */
+    .tr-colaborador {
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .tr-colaborador:hover { background: #eaf0ff !important; }
+    .tr-colaborador.ativo { background: #d0e4ff !important; font-weight: bold; }
+
+    /* Banner de filtro ativo */
+    .banner-filtro {
+        background: #4e73df;
+        color: #fff;
+        border-radius: 8px;
+        padding: 10px 18px;
+        margin-bottom: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .banner-filtro a { color: #fff !important; text-decoration: underline !important; font-size: 0.9rem; font-weight: bold !important; }
+
+    body.dark-mode .card-dashboard { background: #1e2a3a !important; color: #d0dce8 !important; }
+    body.dark-mode .filter-card    { background: #1e2a3a !important; border-color: #2d3f52 !important; color: #d0dce8 !important; }
+    body.dark-mode .table th       { background: #162030 !important; color: #90b4ce !important; }
+    body.dark-mode .table td       { border-color: #2d3f52 !important; color: #d0dce8 !important; }
+    body.dark-mode .big-number     { color: #d0dce8 !important; }
+    body.dark-mode .tr-colaborador:hover { background: #1a3a5c !important; }
+    body.dark-mode .tr-colaborador.ativo { background: #0d2a4a !important; }
+
+    .tr-motivo {
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .tr-motivo:hover { background: #ffeaea !important; }
+    .tr-motivo.ativo { background: #ffd0d0 !important; font-weight: bold; }
+    body.dark-mode .tr-motivo:hover { background: #3a1a1a !important; }
+    body.dark-mode .tr-motivo.ativo { background: #4a0d0d !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <h1 class="h3" style="color:#4e73df;">
+                <i class="fas fa-user-clock"></i> Relatório de Coberturas de Falta
+            </h1>
+            <p class="text-muted mb-0">Apenas registros com status <strong>PAGO</strong> e fornecedor de cobertura.</p>
+        </div>
+    </div>
+
+    {% if colaborador_selecionado %}
+    <div class="banner-filtro">
+        <span><i class="fas fa-filter mr-2"></i> Filtrando por colaborador: <strong>{{ colaborador_selecionado }}</strong></span>
+        <a href="?data_inicio={{ data_inicio }}&data_fim={{ data_fim }}{% if motivo_id %}&motivo={{ motivo_id }}{% endif %}">
+            <i class="fas fa-times"></i> Remover filtro
+        </a>
+    </div>
+    {% endif %}
+
+    {% if motivo_selecionado %}
+    <div class="banner-filtro" style="background:#e74a3b;">
+        <span><i class="fas fa-filter mr-2"></i> Filtrando por motivo: <strong>{{ motivo_selecionado }}</strong></span>
+        <a href="?data_inicio={{ data_inicio }}&data_fim={{ data_fim }}{% if colaborador_id %}&colaborador={{ colaborador_id }}{% endif %}">
+            <i class="fas fa-times"></i> Remover filtro
+        </a>
+    </div>
+    {% endif %}
+
+    <div class="filter-card shadow-sm">
+        <form method="GET" class="form-inline d-flex align-items-center flex-wrap" style="gap:8px;">
+            {% if colaborador_id %}
+            <input type="hidden" name="colaborador" value="{{ colaborador_id }}">
+            {% endif %}
+            {% if motivo_id %}
+            <input type="hidden" name="motivo" value="{{ motivo_id }}">
+            {% endif %}
+            <label class="font-weight-bold mr-2"><i class="fas fa-calendar-alt"></i> Período (início cobertura):</label>
+            <input type="date" name="data_inicio" class="form-control form-control-sm mr-2"
+                   value="{{ data_inicio }}" placeholder="De">
+            <input type="date" name="data_fim" class="form-control form-control-sm mr-2"
+                   value="{{ data_fim }}" placeholder="Até">
+            <button type="submit" class="btn btn-primary btn-sm mr-2">
+                <i class="fas fa-filter"></i> Filtrar
+            </button>
+            {% if data_inicio or data_fim or colaborador_id %}
+            <a href="?" class="btn btn-secondary btn-sm">
+                <i class="fas fa-times"></i> Limpar tudo
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-xl-4 col-md-6">
+            <div class="card-dashboard border-left-primary">
+                <div class="card-body-custom">
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                        Total Gasto em Coberturas
+                    </div>
+                    <div class="big-number text-gray-800">
+                        R$ {{ total_gasto|floatformat:2|intcomma }}
+                    </div>
+                    {% if colaborador_selecionado %}
+                    <div class="text-small text-muted">{{ colaborador_selecionado }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4 col-md-6">
+            <div class="card-dashboard border-left-warning">
+                <div class="card-body-custom">
+                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                        Total de Ocorrências
+                    </div>
+                    <div class="big-number text-gray-800">
+                        {{ total_ocorrencias }}
+                    </div>
+                    <div class="text-small text-muted">coberturas pagas</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card-dashboard">
+                <div class="card-header-custom bg-primary text-white">
+                    <i class="fas fa-trophy"></i> Colaboradores que Mais Faltaram
+                    <small class="d-block" style="font-weight:normal;text-transform:none;opacity:.8;">Clique para filtrar</small>
+                </div>
+                <div class="card-body-custom p-0">
+                    {% if ranking_colaboradores %}
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Colaborador</th>
+                                <th>Filial</th>
+                                <th class="text-center">Faltas</th>
+                                <th class="text-right">Valor Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in ranking_colaboradores %}
+                            <tr class="tr-colaborador {% if colaborador_id == c.collab_id|stringformat:'s' %}ativo{% endif %}"
+                                data-href="?colaborador={{ c.collab_id }}&data_inicio={{ data_inicio }}&data_fim={{ data_fim }}">
+                                <td class="text-muted">{{ forloop.counter }}</td>
+                                <td>
+                                    {% if colaborador_id == c.collab_id|stringformat:'s' %}
+                                        <i class="fas fa-check-circle text-primary mr-1"></i>
+                                    {% endif %}
+                                    {{ c.nome }}
+                                </td>
+                                <td>{{ c.filial_nome|default:"—" }}</td>
+                                <td class="text-center">
+                                    <span class="badge badge-warning">{{ c.qtd }}</span>
+                                </td>
+                                <td class="text-right">R$ {{ c.valor_total|floatformat:2|intcomma }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="p-3 text-muted">Nenhum dado encontrado.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <div class="card-dashboard">
+                <div class="card-header-custom bg-danger text-white">
+                    <i class="fas fa-exclamation-circle"></i> Motivos de Ausência
+                    <small class="d-block" style="font-weight:normal;text-transform:none;opacity:.8;">Clique para filtrar</small>
+                </div>
+                <div class="card-body-custom p-0">
+                    {% if motivos %}
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Motivo</th>
+                                <th class="text-center">Qtd</th>
+                                <th>% do Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in motivos %}
+                            <tr {% if m.motivo_id_val %}class="tr-motivo {% if motivo_id == m.motivo_id_val|stringformat:'s' %}ativo{% endif %}" data-href="?motivo={{ m.motivo_id_val }}&data_inicio={{ data_inicio }}&data_fim={{ data_fim }}{% if colaborador_id %}&colaborador={{ colaborador_id }}{% endif %}"{% endif %}>
+                                <td>
+                                    {% if m.motivo_id_val and motivo_id == m.motivo_id_val|stringformat:'s' %}
+                                        <i class="fas fa-check-circle text-danger mr-1"></i>
+                                    {% endif %}
+                                    {% if not m.motivo_id_val %}<em class="text-muted">{% endif %}
+                                    {{ m.motivo }}
+                                    {% if not m.motivo_id_val %}</em>{% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-danger">{{ m.qtd }}</span>
+                                </td>
+                                <td>
+                                    <span class="pct-bar" style="width:{{ m.percentual }}px; max-width:80px; background:#e74a3b;"></span>
+                                    <small class="ml-1">{{ m.percentual }}%</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="p-3 text-muted">Nenhum dado encontrado.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card-dashboard">
+                <div class="card-header-custom bg-info text-white">
+                    <i class="fas fa-calendar-week"></i> Dias da Semana com Mais Coberturas
+                </div>
+                <div class="card-body-custom p-0">
+                    {% if dias_semana %}
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Dia da Semana</th>
+                                <th class="text-center">Ocorrências</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in dias_semana %}
+                            <tr>
+                                <td><i class="fas fa-calendar-day text-info"></i> {{ d.dia }}</td>
+                                <td class="text-center">
+                                    <span class="badge badge-info">{{ d.qtd }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="p-3 text-muted">Nenhum dado encontrado.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+document.querySelectorAll('.tr-colaborador, .tr-motivo').forEach(function(tr) {
+    tr.addEventListener('click', function() {
+        window.location.href = this.dataset.href;
+    });
+});
+</script>
+{% endblock %}
