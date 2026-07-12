@@ -115,6 +115,23 @@ body.dark-mode #result_list thead tr {
     border-color: #2d3f52 !important;
 }
 
+/* ── Widget de permissões (SelectFilter) ─────────────────────────────────── */
+.selector {
+    width: 100% !important;
+}
+.selector .selector-available,
+.selector .selector-chosen {
+    width: 45% !important;
+}
+.selector select {
+    width: 100% !important;
+    min-height: 300px !important;
+    font-size: 0.82rem !important;
+}
+.selector-chooser {
+    width: 10% !important;
+}
+
 /* 1. Linha principal: flex com label fixo na esquerda */
 .form-group .row {
     display: flex !important;
