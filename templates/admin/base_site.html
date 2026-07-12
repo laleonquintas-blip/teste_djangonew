@@ -178,6 +178,54 @@ body.dark-mode .card-header-custom {
         li.appendChild(btn);
         navRight.insertBefore(li, navRight.firstChild);
     }
+
+    // Botão Desktop / Mobile
+    var vp = document.querySelector('meta[name="viewport"]');
+    var isDesktop = localStorage.getItem('malupe_viewport') === 'desktop';
+    if(isDesktop && vp) vp.setAttribute('content', 'width=1280');
+
+    if(navRight && !document.getElementById('viewport-toggle-btn')){
+        var li2  = document.createElement('li');
+        li2.className = 'nav-item';
+        var btn2 = document.createElement('button');
+        btn2.id   = 'viewport-toggle-btn';
+        btn2.type = 'button';
+        btn2.style.cssText = 'background:transparent;border:1px solid rgba(255,255,255,.35);border-radius:20px;color:#fff;cursor:pointer;font-size:13px;padding:3px 14px;margin:7px 6px 0 0;transition:background .2s,border-color .2s;white-space:nowrap;';
+        btn2.innerHTML = isDesktop ? '&#128247; Mobile' : '&#128444; Desktop';
+        btn2.onclick = function(){
+            var vp2 = document.querySelector('meta[name="viewport"]');
+            var nowDesktop = localStorage.getItem('malupe_viewport') === 'desktop';
+            if(nowDesktop){
+                localStorage.setItem('malupe_viewport', 'mobile');
+                if(vp2) vp2.setAttribute('content', 'width=device-width, initial-scale=1');
+                btn2.innerHTML = '&#128444; Desktop';
+            } else {
+                localStorage.setItem('malupe_viewport', 'desktop');
+                if(vp2) vp2.setAttribute('content', 'width=1280');
+                btn2.innerHTML = '&#128247; Mobile';
+            }
+        };
+        li2.appendChild(btn2);
+        navRight.insertBefore(li2, navRight.firstChild);
+    }
+
+    // Busca inline na listagem de Colaboradores
+    var path = window.location.pathname;
+    if (path.indexOf('colaborador') !== -1 && document.getElementById('result_list')) {
+        var tabela = document.getElementById('result_list');
+        var wrapper = tabela.parentNode;
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Pesquisar por nome...';
+        input.style.cssText = 'width:100%;padding:8px 12px;margin-bottom:10px;border:1px solid #ced4da;border-radius:4px;font-size:.9rem;box-sizing:border-box;';
+        wrapper.insertBefore(input, tabela);
+        input.addEventListener('input', function () {
+            var termo = this.value.toLowerCase();
+            tabela.querySelectorAll('tbody tr').forEach(function (tr) {
+                tr.style.display = tr.innerText.toLowerCase().indexOf(termo) !== -1 ? '' : 'none';
+            });
+        });
+    }
 })();
 </script>
 {% endblock %}

@@ -233,3 +233,48 @@ body.dark-mode .select2-container--default .select2-results__option {
 body.dark-mode .select2-container--default .select2-results__option--highlighted {
     background-color: #253549 !important;
 }
+
+/* ── Sidebar: seção ativa com cor de destaque e itens filhos em lavanda ── */
+
+/* Cabeçalho da seção expandida */
+.main-sidebar .nav-sidebar > .nav-item.menu-open > .nav-link,
+.main-sidebar .nav-sidebar > .nav-item.menu-open > .nav-link:hover {
+    background-color: #6c5ce7 !important;
+    color: #ffffff !important;
+    border-radius: 6px 6px 0 0;
+}
+
+.main-sidebar .nav-sidebar > .nav-item.menu-open > .nav-link .nav-icon,
+.main-sidebar .nav-sidebar > .nav-item.menu-open > .nav-link .right {
+    color: #ffffff !important;
+}
+
+/* Container dos itens filhos */
+.main-sidebar .nav-sidebar > .nav-item.menu-open > .nav-treeview {
+    background-color: #ede9fb !important;
+    border-radius: 0 0 6px 6px;
+    padding-bottom: 4px;
+}
+
+/* Itens filhos */
+.main-sidebar .nav-sidebar .nav-treeview .nav-item .nav-link {
+    color: #3d2fa3 !important;
+    font-weight: 500;
+}
+
+.main-sidebar .nav-sidebar .nav-treeview .nav-item .nav-link:hover {
+    background-color: #d8d0f7 !important;
+    color: #2a1f7a !important;
+}
+
+/* Item filho ativo (página atual) */
+.main-sidebar .nav-sidebar .nav-treeview .nav-item .nav-link.active {
+    background-color: #6c5ce7 !important;
+    color: #ffffff !important;
+    border-radius: 4px;
+}
+
+/* Hover na seção fechada */
+.main-sidebar .nav-sidebar > .nav-item:not(.menu-open) > .nav-link:hover {
+    background-color: rgba(108, 92, 231, 0.25) !important;
+}

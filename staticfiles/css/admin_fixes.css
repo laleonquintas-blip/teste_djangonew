@@ -1,5 +1,78 @@
 /* static/css/admin_fixes.css */
 
+/* ── Sidebar: seção ativa com cor de destaque e itens filhos em lavanda ── */
+
+/* Cabeçalho da seção expandida */
+.main-sidebar .nav-sidebar > .nav-item.menu-open > .nav-link,
+.main-sidebar .nav-sidebar > .nav-item.menu-open > .nav-link:hover {
+    background-color: #6c5ce7 !important;
+    color: #ffffff !important;
+    border-radius: 6px 6px 0 0;
+}
+
+/* Ícone da seção expandida */
+.main-sidebar .nav-sidebar > .nav-item.menu-open > .nav-link .nav-icon {
+    color: #ffffff !important;
+}
+
+/* Seta da seção expandida */
+.main-sidebar .nav-sidebar > .nav-item.menu-open > .nav-link .right {
+    color: #ffffff !important;
+}
+
+/* Container dos itens filhos */
+.main-sidebar .nav-sidebar > .nav-item.menu-open > .nav-treeview {
+    background-color: #ede9fb !important;
+    border-radius: 0 0 6px 6px;
+    padding-bottom: 4px;
+}
+
+/* Itens filhos */
+.main-sidebar .nav-sidebar .nav-treeview .nav-item .nav-link {
+    color: #3d2fa3 !important;
+    font-weight: 500;
+}
+
+.main-sidebar .nav-sidebar .nav-treeview .nav-item .nav-link:hover {
+    background-color: #d8d0f7 !important;
+    color: #2a1f7a !important;
+}
+
+/* Item filho ativo (página atual) */
+.main-sidebar .nav-sidebar .nav-treeview .nav-item .nav-link.active {
+    background-color: #6c5ce7 !important;
+    color: #ffffff !important;
+    border-radius: 4px;
+}
+
+/* Hover na seção fechada */
+.main-sidebar .nav-sidebar > .nav-item > .nav-link:hover {
+    background-color: rgba(108, 92, 231, 0.2) !important;
+    color: #ffffff !important;
+}
+
+
+/* ── Erros de campo: destaque em vermelho ── */
+.field-box .errorlist,
+.form-row .errorlist,
+.fieldBox .errorlist,
+ul.errorlist {
+    list-style: none !important;
+    margin: 4px 0 0 0 !important;
+    padding: 0 !important;
+}
+ul.errorlist li {
+    color: #e74c3c !important;
+    font-weight: bold !important;
+    font-size: 12px !important;
+    background: #fdecea !important;
+    border: 1px solid #e74c3c !important;
+    border-radius: 4px !important;
+    padding: 4px 8px !important;
+    margin-top: 3px !important;
+    display: block !important;
+}
+
 /* Tabela de prévia de importação (import_export) — modo claro */
 .import-preview table tbody tr,
 .import-preview table tbody tr td,
@@ -217,11 +290,32 @@ body.dark-mode #result_list thead tr {
 
 .admindatefilter .controls input[type="submit"]:hover { background-color: #0056b3 !important; }
 .admindatefilter .controls input[type="reset"]:hover  { background-color: #545b62 !important; }
-// static/js/admin_custom.js
 
-document.addEventListener('DOMContentLoaded', function () {
-    // Remove o width:48% inline que o rangefilter injeta no botão Pesquisar
-    document.querySelectorAll('.admindatefilter .controls input[type="submit"]').forEach(function (btn) {
-        btn.style.removeProperty('width');
-    });
-});
+/* ── Sidebar: forçar posicionamento e background corretos ── */
+.main-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    width: 250px !important;
+    z-index: 1038 !important;
+    overflow: hidden !important;
+}
+
+.sidebar-dark-primary {
+    background-color: #343a40 !important;
+}
+
+.content-wrapper {
+    margin-left: 250px !important;
+    min-height: 100vh;
+}
+
+body.sidebar-collapse .main-sidebar {
+    width: 4.6rem !important;
+}
+
+body.sidebar-collapse .content-wrapper {
+    margin-left: 4.6rem !important;
+}

@@ -19,6 +19,14 @@ onReady(function () {
         document.body.classList.add('dark-mode');
     }
 
+    // ── 1b. Força sidebar sempre visível (impede AdminLTE de colapsar para o topo) ──
+    document.body.classList.remove('sidebar-collapse', 'sidebar-mini-xs', 'sidebar-mini');
+    try {
+        localStorage.removeItem('lte3|sidenav|collapsed');
+        localStorage.removeItem('lte|sidenav|collapsed');
+    } catch (e) {}
+
+
     // ── 2. Injeta botão dark/light na navbar ─────────────────────────────────
     var isDark = document.body.classList.contains('dark-mode');
     var navRight = document.querySelector('.navbar-nav.ml-auto');
@@ -42,6 +50,24 @@ onReady(function () {
         li.appendChild(btn);
         navRight.insertBefore(li, navRight.firstChild);
     }
+
+    // ── 2b. Bloqueia duplo envio de formulário ───────────────────────────────
+    document.querySelectorAll('form[method="post"]').forEach(function (form) {
+        var enviado = false;
+        form.addEventListener('submit', function (e) {
+            if (enviado) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                return false;
+            }
+            enviado = true;
+            form.querySelectorAll('input[type="submit"], button[type="submit"]').forEach(function (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                btn.style.cursor = 'not-allowed';
+            });
+        });
+    });
 
     // ── 3. Remove campo fantasma 'q' da sidebar ──────────────────────────────
     document.querySelectorAll('#changelist-filter input[name="q"]').forEach(function (el) {

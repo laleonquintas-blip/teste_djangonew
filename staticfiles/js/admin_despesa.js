@@ -8,7 +8,9 @@
         '.field-inicio_cobertura', '.field-fim_cobertura',
         '.field-tomador', '.field-filial',
         '.field-motivo_ausencia', '.field-colaborador_faltou',
-        '.field-nome_cobriu', '.field-forma_pagamento',
+    ];
+    const camposSolicitacao = [
+        '.field-nome_cobriu',
         '.field-dados_bancarios_pagto'
     ];
 
@@ -41,13 +43,20 @@
         }
 
         // Aplica as regras de visibilidade
-        if (selectedType === 'SOLICITACAO' || selectedType === 'EXTRA') {
+        if (selectedType === 'SOLICITACAO') {
             camposGerais.forEach(function(cls) { $(cls).show(); });
+            camposSolicitacao.forEach(function(cls) { $(cls).show(); });
+            camposCaixinha.forEach(function(cls) { $(cls).hide(); });
+        }
+        else if (selectedType === 'EXTRA') {
+            camposGerais.forEach(function(cls) { $(cls).show(); });
+            camposSolicitacao.forEach(function(cls) { $(cls).hide(); });
             camposCaixinha.forEach(function(cls) { $(cls).hide(); });
         }
         else if (selectedType === 'CAIXINHA') {
             camposCaixinha.forEach(function(cls) { $(cls).show(); });
             camposGerais.forEach(function(cls) { $(cls).hide(); });
+            camposSolicitacao.forEach(function(cls) { $(cls).hide(); });
         }
     }
 
@@ -92,6 +101,62 @@
         $(document).on('select2:select select2:unselect', function (e) {
             if ($(e.target).attr('id') === 'id_status') {
                 toggleMotivoCancelamento();
+            }
+        });
+
+        // ─── 4. COLABORADOR INFO: callback do popup ──────────────────────────
+        // Atualiza o Select2 quando um novo ColaboradorInfo é criado no popup
+        var _origDismiss = window.dismissAddRelatedObjectPopup;
+        window.dismissAddRelatedObjectPopup = function (win, newId, newRepr) {
+            if (win.name === 'add_colaboradorinfo') {
+                var $select = $('#id_colaborador_info');
+                if ($select.length) {
+                    var option = new Option(newRepr, newId, true, true);
+                    $select.append(option).trigger('change');
+                    $.getJSON('/api/colaborador-info/', { id: newId }, function (data) {
+                        if (data.dados) {
+                            var $dados = $('#id_dados_bancarios_pagto');
+                            if ($dados.length && !$dados.prop('readonly')) $dados.val(data.dados);
+                        }
+                    });
+                }
+                win.close();
+                return;
+            }
+            if (_origDismiss) _origDismiss(win, newId, newRepr);
+        };
+
+        // ─── 4b. COLABORADOR INFO → auto-preenche nome_cobriu e dados_bancarios ──
+        $(document).on('select2:select', '#id_colaborador_info', function (e) {
+            var id = e.params.data.id;
+            if (!id) return;
+            $.getJSON('/api/colaborador-info/', { id: id }, function (data) {
+                if (data.nome) {
+                    var $nome = $('#id_nome_cobriu');
+                    if ($nome.length && !$nome.prop('readonly')) {
+                        $nome.val(data.nome);
+                    }
+                }
+                if (data.dados) {
+                    var $dados = $('#id_dados_bancarios_pagto');
+                    if ($dados.length && !$dados.prop('readonly')) {
+                        $dados.val(data.dados);
+                    }
+                }
+            });
+        });
+
+        // ─── 5. VAGAS EM ABERTO → auto-preenche colaborador_faltou ────
+        $(document).on('change select2:select select2:unselect', '#id_motivo_ausencia', function () {
+            var $motivo = $('#id_motivo_ausencia');
+            var vagasMotivoId = $motivo.data('vagas-motivo-id');
+            var vagasColabId  = $motivo.data('vagas-colab-id');
+            if (!vagasMotivoId || !vagasColabId) return;
+
+            var selecionado = $motivo.val();
+            if (String(selecionado) === String(vagasMotivoId)) {
+                var $colab = $('#id_colaborador_faltou');
+                $colab.val(vagasColabId).trigger('change');
             }
         });
     });
