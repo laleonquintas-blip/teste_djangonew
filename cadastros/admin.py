@@ -137,7 +137,14 @@ class ColaboradorInfoAdmin(admin.ModelAdmin):
 # --- REGISTRO ---
 admin.site.register(ColaboradorInfo, ColaboradorInfoAdmin)
 
-admin.site.register(Banco)
+class BancoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nome', 'saldo_inicial', 'entra_no_saldo_geral')
+    list_editable = ('entra_no_saldo_geral',)
+    list_filter = ('entra_no_saldo_geral',)
+    search_fields = ('nome',)
+
+
+admin.site.register(Banco, BancoAdmin)
 admin.site.register(Empresa)
 admin.site.register(TipoServico)
 admin.site.register(MotivoAusencia)

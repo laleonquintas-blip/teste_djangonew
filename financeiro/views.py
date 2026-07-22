@@ -216,7 +216,7 @@ def dashboard_financeiro(request):
         data_referencia = timezone.now().date()
         modo_tempo = 'ATUAL'
 
-    bancos = Banco.objects.exclude(nome__contains="(AUTO)")
+    bancos = Banco.objects.filter(entra_no_saldo_geral=True)
     dados_bancos = []
     saldo_geral = 0
 
