@@ -132,6 +132,164 @@ body.dark-mode #result_list thead tr {
     width: 10% !important;
 }
 
+/* ============================================================
+   RESPONSIVIDADE MOBILE (max-width: 767.98px)
+   ============================================================ */
+
+/* Tabelas de listagem: rolagem horizontal contida, sem estourar a página */
+#changelist .results,
+.card-body .table-responsive,
+.results {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+}
+
+@media (max-width: 767.98px) {
+
+    /* Conteúdo: menos padding lateral para aproveitar a tela */
+    .content-wrapper .content,
+    .content-wrapper > .content {
+        padding: 8px !important;
+    }
+    .card-body { padding: 12px !important; }
+
+    /* Título e breadcrumb empilhados */
+    .content-header h1 { font-size: 1.35rem; }
+    .content-header .breadcrumb { font-size: .75rem; }
+
+    /* Botões de ação (object-tools) em largura total */
+    .object-tools {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100%;
+        gap: 8px;
+        align-items: stretch !important;
+        float: none !important;
+        margin: 8px 0 !important;
+    }
+    .object-tools li { width: 100%; }
+    .object-tools a,
+    .object-tools .btn {
+        display: block;
+        width: 100% !important;
+        min-width: 0 !important;
+        padding: 12px !important;
+        text-align: center !important;
+        font-size: 14px;
+    }
+
+    /* Cards do dashboard: 1 por linha */
+    .dashboard-cards { gap: 10px; }
+    .dashboard-cards .card-link {
+        flex: 1 1 100% !important;
+        max-width: 100% !important;
+        min-width: 100% !important;
+    }
+
+    /* Tabela de resultados: fonte compacta e células sem quebra */
+    #result_list { font-size: 12.5px; }
+    #result_list th, #result_list td {
+        white-space: nowrap;
+        padding: 8px 6px !important;
+    }
+
+    /* Inputs e selects: altura de toque + 16px evita zoom do iOS */
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"],
+    select,
+    .form-control {
+        min-height: 42px;
+        font-size: 16px !important;
+    }
+    textarea { font-size: 16px !important; }
+
+    /* Select2 acompanha a altura */
+    .select2-container--default .select2-selection--single {
+        min-height: 42px !important;
+        line-height: 42px;
+    }
+    .select2-container { width: 100% !important; max-width: 100%; }
+
+    /* Formulários: campos em largura total (fieldsets do Django/Jazzmin) */
+    .form-row { flex-direction: column; }
+    .field-box { width: 100% !important; margin-right: 0 !important; }
+    .form-group.row > [class*="col-"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .form-group.row label.col-form-label {
+        text-align: left !important;
+        padding-bottom: 2px;
+    }
+
+    /* Abas (tabs) roláveis na horizontal em vez de quebrar */
+    .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+    .nav-tabs .nav-item { flex-shrink: 0; }
+
+    /* Widget de permissões empilhado */
+    .selector { display: block !important; }
+    .selector .selector-available,
+    .selector .selector-chosen {
+        width: 100% !important;
+        float: none !important;
+    }
+    .selector select { min-height: 180px !important; }
+    .selector-chooser {
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: center;
+        gap: 14px;
+        margin: 8px 0 !important;
+    }
+
+    /* Paginação com quebra de linha */
+    .pagination { flex-wrap: wrap; }
+
+    /* Linha de submit (Salvar etc.) empilhada e em largura total */
+    .submit-row,
+    #jazzy-actions .form-group,
+    #jazzy-actions {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px;
+        width: 100%;
+    }
+    .submit-row input[type="submit"],
+    .submit-row a.btn,
+    .submit-row button,
+    #jazzy-actions .btn {
+        width: 100% !important;
+        padding: 12px !important;
+        margin: 0 !important;
+    }
+
+    /* Inlines tabulares roláveis */
+    .inline-group,
+    .tabular.inline-related {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Filtro de data (rangefilter) sem estourar */
+    .admindatefilter { max-width: 100%; }
+}
+
+/* Telas muito pequenas (<400px): fonte da tabela ainda menor */
+@media (max-width: 399.98px) {
+    #result_list { font-size: 11.5px; }
+    .content-header h1 { font-size: 1.15rem; }
+}
+
 /* 1. Linha principal: flex com label fixo na esquerda */
 .form-group .row {
     display: flex !important;

@@ -84,8 +84,28 @@
 .cfb-btn-clear  { background: #e9ecef; color: #495057; }
 .cfb-btn-clear:hover  { background: #ced4da; }
 @media (max-width: 768px) {
-    .cfb-row { flex-direction: column; }
-    .cfb-field { min-width: 100%; }
+    .cfb-wrap { padding: 12px 12px 10px; }
+    .cfb-row { flex-direction: column; align-items: stretch; gap: 12px; }
+    /* vence os min/max-width inline dos templates */
+    .cfb-field {
+        min-width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 auto !important;
+        width: 100%;
+    }
+    .cfb-field label { white-space: normal; }
+    .cfb-field input[type="text"],
+    .cfb-field input[type="date"],
+    .cfb-field select {
+        width: 100%;
+        height: 42px;           /* alvo de toque confortável */
+        font-size: 16px;        /* evita zoom automático do iOS */
+    }
+    .cfb-field.cfb-date-range { flex-direction: row; flex-wrap: nowrap; }
+    .cfb-field.cfb-date-range .cfb-sub { flex: 1 1 0; min-width: 0; }
+    .cfb-field.cfb-date-range .cfb-sub input { width: 100%; }
+    .cfb-actions { flex-direction: row; }
+    .cfb-btn { flex: 1 1 0; height: 44px; font-size: 13px; }
 }
 </style>
 <script>
