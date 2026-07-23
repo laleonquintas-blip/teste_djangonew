@@ -917,12 +917,13 @@ class DespesaAdmin(admin.ModelAdmin):
 
         if change and obj.status == 'CONFERIDO' and obj.tipo_lancamento == 'CAIXINHA' and 'status' in form.changed_data:
             from financeiro.models import SaldoSupervisor
-            if not SaldoSupervisor.objects.filter(supervisor=obj.solicitante, status='ABERTO').exists():
+            if not SaldoSupervisor.objects.filter(supervisor=request.user, status='ABERTO').exists():
                 status_anterior = Despesa.objects.get(pk=obj.pk).status
                 obj.status = status_anterior
+                nome_quem_confere = request.user.first_name or request.user.username
                 self.message_user(
                     request,
-                    f"Não é possível conferir: {obj.solicitante.first_name} não possui ciclo de saldo supervisor em aberto.",
+                    f"Não é possível conferir: {nome_quem_confere} não possui ciclo de saldo supervisor em aberto.",
                     level='error',
                 )
             else:
@@ -1020,20 +1021,27 @@ class DespesaAdmin(admin.ModelAdmin):
 
     def registrar_utilizacao_supervisor(self, despesa, request):
         from financeiro.models import SaldoSupervisor, MovimentacaoSupervisor
-        supervisor = despesa.solicitante
+        # Debita de quem CONFERIU a caixinha (request.user), não de quem a solicitou —
+        # quem confere é quem efetivamente está com o dinheiro/comprovante em mãos.
+        supervisor = request.user
 
-        # Só debita se o solicitante já tiver um ciclo aberto — nunca cria ciclo automaticamente
+        # Só debita se quem conferiu já tiver um ciclo aberto — nunca cria ciclo automaticamente
         saldo_sup = SaldoSupervisor.objects.filter(
             supervisor=supervisor, status='ABERTO'
         ).order_by('-data_inicio').first()
         if not saldo_sup:
             return
 
+        solicitante_nome = despesa.solicitante.first_name or despesa.solicitante.username
+        descricao = f"Caixinha #{despesa.id} — {despesa.fornecedor}"
+        if despesa.solicitante_id != request.user.id:
+            descricao += f" (solicitada por {solicitante_nome})"
+
         MovimentacaoSupervisor.objects.create(
             saldo_supervisor=saldo_sup,
             tipo='DEBITO',
             valor=despesa.valor,
-            descricao=f"Caixinha #{despesa.id} — {despesa.fornecedor}",
+            descricao=descricao,
             referencia_despesa_id=despesa.id,
         )
 
