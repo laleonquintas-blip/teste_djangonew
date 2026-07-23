@@ -52,6 +52,10 @@ onReady(function () {
     }
 
     // ── 2b. Bloqueia duplo envio de formulário ───────────────────────────────
+    // IMPORTANTE: desabilitar o botão DENTRO do handler 'submit' faz o navegador
+    // omitir o name/value desse botão do POST (o form data é montado após os
+    // listeners rodarem). Por isso o disable é adiado com setTimeout — assim o
+    // navegador já capturou qual botão foi clicado antes de desabilitá-lo.
     document.querySelectorAll('form[method="post"]').forEach(function (form) {
         var enviado = false;
         form.addEventListener('submit', function (e) {
@@ -61,11 +65,13 @@ onReady(function () {
                 return false;
             }
             enviado = true;
-            form.querySelectorAll('input[type="submit"], button[type="submit"]').forEach(function (btn) {
-                btn.disabled = true;
-                btn.style.opacity = '0.6';
-                btn.style.cursor = 'not-allowed';
-            });
+            setTimeout(function () {
+                form.querySelectorAll('input[type="submit"], button[type="submit"]').forEach(function (btn) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.6';
+                    btn.style.cursor = 'not-allowed';
+                });
+            }, 0);
         });
     });
 

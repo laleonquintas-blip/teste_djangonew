@@ -90,7 +90,11 @@
       </div>{# /tab-content #}
     </div>{# /card #}
 
-    {% block submit_buttons_bottom %}{% submit_row %}{% endblock %}
+    {% comment %}
+    Sem botão "Salvar" genérico: todos os campos são só-leitura.
+    A única ação possível é o "Confirmar Fechamento do Ciclo" dentro da aba correspondente.
+    {% endcomment %}
+    {% block submit_buttons_bottom %}{% endblock %}
   </form>
 </div>
 
