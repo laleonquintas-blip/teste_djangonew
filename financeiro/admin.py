@@ -433,40 +433,13 @@ def gerar_fixos_mensais(modeladmin, request, queryset):
 
 
 # --- 1. CONTAS A PAGAR ---
-from django import forms as django_forms
-
-class ContasAPagarForm(django_forms.ModelForm):
-    def clean(self):
-        cleaned_data = super().clean()
-        status = cleaned_data.get('status')
-        supervisor = cleaned_data.get('supervisor')
-        if status == 'PAGO' and supervisor:
-            old_status = None
-            if self.instance.pk:
-                try:
-                    old_status = ContasAPagar.objects.get(pk=self.instance.pk).status
-                except ContasAPagar.DoesNotExist:
-                    pass
-            if old_status != 'PAGO':
-                saldo_aberto = SaldoSupervisor.objects.filter(
-                    supervisor=supervisor, status='ABERTO'
-                ).first()
-                if saldo_aberto:
-                    nome = supervisor.first_name.strip() or supervisor.username
-                    raise django_forms.ValidationError(
-                        f"❌ {nome} já possui um ciclo em aberto ({saldo_aberto.numero}). "
-                        f"Feche o ciclo atual em Saldo Supervisores antes de registrar novo crédito."
-                    )
-        return cleaned_data
-
-    class Meta:
-        model = ContasAPagar
-        fields = '__all__'
-
+# Nota: antes havia uma regra bloqueando o crédito a um supervisor quando ele já
+# tinha um ciclo em aberto (exigia fechar o ciclo antes). Removida — o model já
+# credita automaticamente no ciclo aberto existente (financeiro/models.py,
+# ContasAPagar._save_logic), então não há mais motivo para bloquear.
 
 class ContasAPagarAdmin(ImportExportModelAdmin):
     resource_classes = [ContasAPagarResource]
-    form = ContasAPagarForm
     list_display = ('nota', 'fornecedor', 'vencimento', 'valor', 'status_visual', 'responsavel_pagamento', 'data_baixa', 'usuario_baixa')
     search_fields = ('fornecedor__razao_social', 'nota', 'observacoes')
     list_filter = (
