@@ -620,7 +620,8 @@ class TransferenciaAdmin(admin.ModelAdmin):
             'fields': (
                 'data',
                 'empresa',
-                ('banco_origem', 'banco_destino'),
+                'banco_origem',
+                'banco_destino',
                 'valor',
                 'observacao',
             )
