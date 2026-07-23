@@ -13,6 +13,11 @@ from django.contrib import messages
 from django.urls import path
 
 from .models import ContasAPagar, ContasAReceber, BaseSaldo, GerarFixo, Transferencia, SaldoSupervisor, MovimentacaoSupervisor
+
+
+def fmt_brl(valor):
+    """Formata número no padrão BR: milhar com ponto, decimal com vírgula."""
+    return '{:,.2f}'.format(float(valor)).replace(',', 'X').replace('.', ',').replace('X', '.')
 from .resources import ContasAPagarResource, ContasAReceberResource
 from cadastros.models import Cliente
 from django.contrib.auth.models import Group
@@ -811,7 +816,7 @@ class MovimentacaoInline(admin.TabularInline):
         sinal = '+' if obj.tipo == 'CREDITO' else '-'
         return format_html(
             '<span style="color:{};font-weight:bold;">{} R$ {}</span>',
-            cor, sinal, f'{obj.valor:,.2f}'
+            cor, sinal, fmt_brl(obj.valor)
         )
     valor_display.short_description = "Valor"
 
@@ -911,17 +916,17 @@ class SaldoSupervisorAdmin(admin.ModelAdmin):
     nome_supervisor.short_description = "Supervisor"
 
     def saldo_disponivel_display(self, obj):
-        return format_html('<span style="color:#27ae60;font-weight:bold;">R$ {}</span>', f'{obj.saldo_disponivel:,.2f}')
+        return format_html('<span style="color:#27ae60;font-weight:bold;">R$ {}</span>', fmt_brl(obj.saldo_disponivel))
     saldo_disponivel_display.short_description = "Saldo Disponível"
 
     def utilizacao_display(self, obj):
-        return format_html('<span style="color:#e74c3c;font-weight:bold;">R$ {}</span>', f'{obj.utilizacao:,.2f}')
+        return format_html('<span style="color:#e74c3c;font-weight:bold;">R$ {}</span>', fmt_brl(obj.utilizacao))
     utilizacao_display.short_description = "Utilização"
 
     def saldo_display(self, obj):
         saldo = obj.saldo
         cor = '#27ae60' if saldo >= 0 else '#e74c3c'
-        return format_html('<span style="color:{};font-weight:bold;">R$ {}</span>', cor, f'{saldo:,.2f}')
+        return format_html('<span style="color:{};font-weight:bold;">R$ {}</span>', cor, fmt_brl(saldo))
     saldo_display.short_description = "Saldo"
 
 
