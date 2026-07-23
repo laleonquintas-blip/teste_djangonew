@@ -138,10 +138,29 @@ class ColaboradorInfoAdmin(admin.ModelAdmin):
 admin.site.register(ColaboradorInfo, ColaboradorInfoAdmin)
 
 class BancoAdmin(admin.ModelAdmin):
-    list_display = ('id', 'nome', 'saldo_inicial', 'entra_no_saldo_geral')
+    list_display = ('id', 'nome', 'saldo_inicial', 'entra_no_saldo_geral', 'ultima_alteracao_display')
     list_editable = ('entra_no_saldo_geral',)
     list_filter = ('entra_no_saldo_geral',)
     search_fields = ('nome',)
+
+    def ultima_alteracao_display(self, obj):
+        from django.contrib.admin.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+        from django.utils.html import format_html
+
+        ct = ContentType.objects.get_for_model(Banco)
+        log = (
+            LogEntry.objects.filter(content_type=ct, object_id=str(obj.pk))
+            .select_related('user')
+            .order_by('-action_time')
+            .first()
+        )
+        if not log:
+            return '—'
+        usuario = (log.user.first_name or log.user.username) if log.user else 'Sistema'
+        quando = log.action_time.strftime('%d/%m/%Y %H:%M')
+        return format_html('{} — <strong>{}</strong>', quando, usuario)
+    ultima_alteracao_display.short_description = 'Última Alteração'
 
 
 admin.site.register(Banco, BancoAdmin)
