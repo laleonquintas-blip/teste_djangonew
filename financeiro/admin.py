@@ -862,6 +862,8 @@ class SaldoSupervisorAdmin(admin.ModelAdmin):
     change_list_template = 'admin/financeiro/saldosupervisor/change_list.html'
     list_display = ('numero', 'nome_supervisor', 'data_inicio', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display', 'status_display')
     list_filter = (SSNumeroFilter, SSSupervisorFilter, SSInicioDe, SSInicioAte, SSStatusFilter)
+    # 'ABERTO' < 'CANCELADO' < 'FECHADO' alfabeticamente — ciclos em aberto sempre no topo
+    ordering = ('status', '-data_inicio')
     readonly_fields = ('numero', 'supervisor', 'saldo_disponivel', 'data_inicio', 'status', 'fechado_por', 'data_fechamento', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display')
     fields = ('numero', 'supervisor', 'saldo_disponivel_display', 'utilizacao_display', 'saldo_display', 'data_inicio', 'status', 'fechado_por', 'data_fechamento')
     inlines = [MovimentacaoInline]
