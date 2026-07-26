@@ -23,6 +23,11 @@
           </li>
           {% if original and original.status == 'ABERTO' %}
           <li class="nav-item">
+            <a class="nav-link" id="tab-transferir-link" data-toggle="tab" href="#tab-transferir" role="tab">
+              💸 Transferir para Banco
+            </a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link" id="tab-fechar-link" data-toggle="tab" href="#tab-fechar" role="tab">
               🔒 Fechar Ciclo
             </a>
@@ -51,7 +56,56 @@
           </div>
         </div>
 
-        {# ── ABA 3: FECHAR CICLO ── #}
+        {# ── ABA 3: TRANSFERIR PARA BANCO ── #}
+        {% if original and original.status == 'ABERTO' %}
+        <div class="tab-pane fade" id="tab-transferir" role="tabpanel">
+          <div style="padding: 20px; max-width: 600px;">
+            <div class="alert alert-info">
+              💸 Transfere um valor do saldo desta pessoa para uma conta bancária da empresa.
+              O saldo dela é debitado e o valor entra no saldo geral do banco escolhido.
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label style="font-weight:bold; display:block; margin-bottom:6px;">Saldo Disponível para Transferência</label>
+              <div style="font-size: 1.4em; font-weight: bold; color: {% if original.saldo >= 0 %}#27ae60{% else %}#e74c3c{% endif %};">
+                R$ {{ original.saldo|floatformat:2 }}
+              </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label for="id_banco_destino" style="font-weight:bold; display:block; margin-bottom:6px;">
+                Banco de Destino
+              </label>
+              <select name="banco_destino" id="id_banco_destino"
+                style="width:100%; padding:8px; border:1px solid #ced4da; border-radius:4px; font-size:14px;">
+                <option value="">— Selecione —</option>
+                {% for banco_id, banco_nome in bancos_opts %}
+                <option value="{{ banco_id }}">{{ banco_nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label for="id_valor_transferencia" style="font-weight:bold; display:block; margin-bottom:6px;">
+                Valor a Transferir (R$)
+              </label>
+              <input type="text" name="valor_transferencia" id="id_valor_transferencia"
+                placeholder="0,00"
+                style="width:100%; padding:8px; border:1px solid #ced4da; border-radius:4px; font-size:14px;">
+            </div>
+
+            <input type="hidden" name="_transferir_banco" value="1">
+
+            <button type="submit" name="_transferir_banco_btn" value="1"
+              style="background:#8e44ad; color:white; border:none; padding:10px 24px;
+                     border-radius:4px; font-weight:bold; font-size:14px; cursor:pointer;">
+              💸 Confirmar Transferência
+            </button>
+          </div>
+        </div>
+        {% endif %}
+
+        {# ── ABA 4: FECHAR CICLO ── #}
         {% if original and original.status == 'ABERTO' %}
         <div class="tab-pane fade" id="tab-fechar" role="tabpanel">
           <div style="padding: 20px; max-width: 600px;">

@@ -5,6 +5,7 @@ from django.utils.html import format_html
 from datetime import date
 from django.shortcuts import render, redirect
 from django.contrib import admin
+from django.db import transaction
 from django.utils import timezone
 from rangefilter.filters import DateRangeFilter
 from import_export.admin import ImportExportModelAdmin
@@ -782,6 +783,13 @@ class MovimentacaoInline(admin.TabularInline):
     def tipo_display(self, obj):
         if obj.tipo == 'CREDITO':
             return format_html('<span style="color:#27ae60;font-weight:bold;">⬆ Crédito</span>')
+        if (obj.descricao or '').startswith('Transferência para'):
+            return format_html(
+                '<span style="color:#e74c3c;font-weight:bold;">⬇ Débito</span> '
+                '<span style="background:#8e44ad;color:#fff;padding:2px 7px;border-radius:4px;'
+                'font-size:10px;font-weight:bold;" title="{}">💸 Transferência</span>',
+                obj.descricao
+            )
         return format_html('<span style="color:#e74c3c;font-weight:bold;">⬇ Débito</span>')
     tipo_display.short_description = "Tipo"
 
@@ -850,10 +858,12 @@ class SaldoSupervisorAdmin(admin.ModelAdmin):
         return False
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        from django.utils import timezone as tz
+        from django.http import HttpResponseRedirect
+        from django.urls import reverse
+        from decimal import Decimal, InvalidOperation
+
         if request.method == 'POST' and '_fechar_ciclo_btn' in request.POST and object_id:
-            from django.utils import timezone as tz
-            from django.http import HttpResponseRedirect
-            from django.urls import reverse
             obj = self.get_object(request, object_id)
             if obj and obj.status == 'ABERTO':
                 obj.status = 'FECHADO'
@@ -863,6 +873,71 @@ class SaldoSupervisorAdmin(admin.ModelAdmin):
                 obj.save()
                 self.message_user(request, f"Ciclo {obj.numero} fechado com sucesso.")
                 return HttpResponseRedirect(reverse('admin:financeiro_saldosupervisor_changelist'))
+
+        if request.method == 'POST' and '_transferir_banco_btn' in request.POST and object_id:
+            obj = self.get_object(request, object_id)
+            redirect_url = reverse('admin:financeiro_saldosupervisor_change', args=[object_id])
+            if not obj or obj.status != 'ABERTO':
+                self.message_user(request, "Ciclo não está aberto.", level='error')
+                return HttpResponseRedirect(redirect_url)
+
+            banco_id = request.POST.get('banco_destino')
+            valor_str = request.POST.get('valor_transferencia', '').strip().replace('.', '').replace(',', '.')
+            try:
+                valor = Decimal(valor_str or '0')
+            except InvalidOperation:
+                valor = Decimal('0')
+
+            if valor <= 0:
+                self.message_user(request, "Informe um valor válido para transferir.", level='error')
+                return HttpResponseRedirect(redirect_url)
+            if valor > obj.saldo:
+                self.message_user(
+                    request,
+                    f"Valor maior que o saldo disponível (R$ {fmt_brl(obj.saldo)}).",
+                    level='error',
+                )
+                return HttpResponseRedirect(redirect_url)
+
+            from cadastros.models import Banco
+            banco = Banco.objects.filter(pk=banco_id).first()
+            if not banco:
+                self.message_user(request, "Selecione um banco de destino válido.", level='error')
+                return HttpResponseRedirect(redirect_url)
+
+            with transaction.atomic():
+                nome_sup = obj.supervisor.first_name or obj.supervisor.username
+                mov = MovimentacaoSupervisor.objects.create(
+                    saldo_supervisor=obj,
+                    tipo='DEBITO',
+                    valor=valor,
+                    descricao=f"Transferência para {banco.nome}",
+                )
+                BaseSaldo.objects.create(
+                    origem='SSUP',
+                    id_origem=mov.id,
+                    nome=f"Transferência de {nome_sup} (Saldo Supervisor)",
+                    empresa='-',
+                    data_emissao=tz.now().date(),
+                    banco=banco.nome,
+                    vencimento=tz.now().date(),
+                    valor=valor,
+                    status='PAGO',
+                    data_baixa=tz.now().date(),
+                    usuario_baixa=request.user.username,
+                )
+            self.message_user(
+                request,
+                f"R$ {fmt_brl(valor)} transferido de {nome_sup} para {banco.nome} com sucesso.",
+            )
+            return HttpResponseRedirect(redirect_url)
+
+        if object_id:
+            from cadastros.models import Banco
+            extra_context = extra_context or {}
+            extra_context['bancos_opts'] = list(
+                Banco.objects.order_by('nome').values_list('id', 'nome')
+            )
         return super().changeform_view(request, object_id, form_url, extra_context)
 
     def fechar_ciclo(self, request, queryset):
