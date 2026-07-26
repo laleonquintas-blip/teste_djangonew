@@ -917,7 +917,15 @@ class DespesaAdmin(admin.ModelAdmin):
 
         if change and obj.status == 'CONFERIDO' and obj.tipo_lancamento == 'CAIXINHA' and 'status' in form.changed_data:
             from financeiro.models import SaldoSupervisor
-            if not SaldoSupervisor.objects.filter(supervisor=request.user, status='ABERTO').exists():
+            # Prioridade: o saldo do próprio solicitante (é a caixinha "dele").
+            # Só cai no saldo de quem está conferindo quando o solicitante não
+            # tiver ciclo aberto (ex.: Glaucia conferindo por outra pessoa que
+            # não participa do controle de saldo supervisor).
+            supervisor_alvo = obj.solicitante
+            if not SaldoSupervisor.objects.filter(supervisor=obj.solicitante, status='ABERTO').exists():
+                supervisor_alvo = request.user
+
+            if not SaldoSupervisor.objects.filter(supervisor=supervisor_alvo, status='ABERTO').exists():
                 status_anterior = Despesa.objects.get(pk=obj.pk).status
                 obj.status = status_anterior
                 nome_quem_confere = request.user.first_name or request.user.username
@@ -927,7 +935,7 @@ class DespesaAdmin(admin.ModelAdmin):
                     level='error',
                 )
             else:
-                self.registrar_utilizacao_supervisor(obj, request)
+                self.registrar_utilizacao_supervisor(obj, request, supervisor_alvo)
 
         super().save_model(request, obj, form, change)
 
@@ -1019,13 +1027,11 @@ class DespesaAdmin(admin.ModelAdmin):
                 plano_de_contas=plano,
             )
 
-    def registrar_utilizacao_supervisor(self, despesa, request):
+    def registrar_utilizacao_supervisor(self, despesa, request, supervisor):
         from financeiro.models import SaldoSupervisor, MovimentacaoSupervisor
-        # Debita de quem CONFERIU a caixinha (request.user), não de quem a solicitou —
-        # quem confere é quem efetivamente está com o dinheiro/comprovante em mãos.
-        supervisor = request.user
-
-        # Só debita se quem conferiu já tiver um ciclo aberto — nunca cria ciclo automaticamente
+        # 'supervisor' já vem decidido pelo chamador: prioriza o saldo do
+        # solicitante; só cai no de quem confere se o solicitante não tiver
+        # ciclo aberto. Nunca cria ciclo automaticamente.
         saldo_sup = SaldoSupervisor.objects.filter(
             supervisor=supervisor, status='ABERTO'
         ).order_by('-data_inicio').first()
@@ -1034,7 +1040,7 @@ class DespesaAdmin(admin.ModelAdmin):
 
         solicitante_nome = despesa.solicitante.first_name or despesa.solicitante.username
         descricao = f"Caixinha #{despesa.id} — {despesa.fornecedor}"
-        if despesa.solicitante_id != request.user.id:
+        if despesa.solicitante_id != supervisor.id:
             descricao += f" (solicitada por {solicitante_nome})"
 
         MovimentacaoSupervisor.objects.create(
