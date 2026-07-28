@@ -11,7 +11,7 @@ from django.db.models import Sum, Count
 from django.utils import timezone
 
 from cadastros.models import Fornecedor, Banco, Cliente, Empresa
-from financeiro.models import ContasAPagar, ContasAReceber, Transferencia
+from financeiro.models import ContasAPagar, ContasAReceber, Transferencia, BaseSaldo
 
 
 @staff_member_required
@@ -244,13 +244,19 @@ def dashboard_financeiro(request):
             status='TEMP_DEVOLVIDA', data_devolucao__lte=data_referencia
         ).aggregate(total=Sum('valor'))['total'] or 0
 
+        # Transferências de Saldo Supervisor para o banco (origem exclusiva 'SSUP' —
+        # não gerada por CP/CR/Transferencia, então não há risco de contar em dobro)
+        transferencias_supervisor = BaseSaldo.objects.filter(
+            banco=banco.nome, origem='SSUP', data_baixa__lte=data_referencia
+        ).aggregate(total=Sum('valor'))['total'] or 0
+
         saldo_inicial = getattr(banco, 'saldo_inicial', 0) or 0
-        saldo = saldo_inicial + total_entradas - total_saidas + transferencias_entrada - transferencias_saida
+        saldo = saldo_inicial + total_entradas - total_saidas + transferencias_entrada - transferencias_saida + transferencias_supervisor
         saldo_geral += saldo
 
         dados_bancos.append({
             'nome': banco.nome,
-            'entradas': total_entradas + transferencias_entrada,
+            'entradas': total_entradas + transferencias_entrada + transferencias_supervisor,
             'saidas': total_saidas + transferencias_saida,
             'saldo': saldo
         })
