@@ -1185,8 +1185,16 @@ class DespesaAdmin(admin.ModelAdmin):
         )
 
         th = 'style="padding:10px 16px;text-align:left;font-weight:600;letter-spacing:.03em;white-space:nowrap;"'
+        botao_imprimir = (
+            '<div class="no-print" style="text-align:right;margin-bottom:10px;">'
+            '<button type="button" onclick="window.print()" '
+            'style="background:#17a2b8;color:#fff;border:none;padding:8px 18px;'
+            'border-radius:4px;font-weight:600;cursor:pointer;font-size:.85rem;">'
+            '🖨 Imprimir Folha</button></div>'
+        )
         header = (
-            '<div style="position:relative;left:50%;transform:translateX(-50%);width:calc(100% + 200px);margin-bottom:-20px;overflow-x:auto;">'
+            f'{botao_imprimir}'
+            '<div id="folha-print-area" style="overflow-x:auto;">'
             '<table style="width:100%;border-collapse:collapse;font-size:.88rem;table-layout:auto;">'
             f'<thead><tr style="background:#343a40;color:#fff;">'
             f'<th {th}>Filial</th><th {th}>Qt</th><th {th}>Nome</th><th {th}>CPF</th>'
@@ -1194,7 +1202,15 @@ class DespesaAdmin(admin.ModelAdmin):
             f'<th {th}>Diferença</th>'
             '</tr></thead><tbody>'
         )
-        return mark_safe(header + ''.join(rows) + '</tbody></table></div>')
+        estilo_impressao = (
+            '<style>@media print {'
+            'body * { visibility: hidden; }'
+            '#folha-print-area, #folha-print-area * { visibility: visible; }'
+            '#folha-print-area { position: absolute; top: 0; left: 0; width: 100%; }'
+            '.no-print { display: none !important; }'
+            '}</style>'
+        )
+        return mark_safe(estilo_impressao + header + ''.join(rows) + '</tbody></table></div>')
     itens_folha_display.short_description = ''
 
     valor_formatado.short_description = "Valor"
