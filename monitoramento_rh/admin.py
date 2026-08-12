@@ -1,3 +1,4 @@
+from django import forms as django_forms
 from django.contrib import admin, messages
 from django.http import HttpResponseRedirect
 from django.utils import timezone
@@ -25,11 +26,42 @@ class CoberturasRHAdmin(admin.ModelAdmin):
 
 # ── Colaboradores Informais inline ────────────────────────────────────────────
 
+class ColaboradorInformalInlineForm(django_forms.ModelForm):
+    class Meta:
+        model = ColaboradorInformal
+        fields = '__all__'
+        help_texts = {
+            'ativo': 'Desmarque para excluir este colaborador das próximas folhas '
+                      '(ex.: saiu/foi desligado) sem apagar o histórico de pagamentos já feitos.',
+        }
+
+
 class ColaboradorInformalInline(admin.TabularInline):
     model   = ColaboradorInformal
+    form    = ColaboradorInformalInlineForm
     extra   = 1
     fields  = ('filial', 'qt', 'nome', 'cpf', 'registro', 'banco', 'agencia', 'conta', 'valor_padrao', 'ativo')
     ordering = ('banco', 'nome')
+    verbose_name_plural = 'Colaboradores Ativos'
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(ativo=True)
+
+
+class ColaboradorInformalInativoInline(admin.TabularInline):
+    model   = ColaboradorInformal
+    form    = ColaboradorInformalInlineForm
+    extra   = 0
+    fields  = ('filial', 'qt', 'nome', 'cpf', 'registro', 'banco', 'agencia', 'conta', 'valor_padrao', 'ativo')
+    ordering = ('banco', 'nome')
+    verbose_name_plural = 'Colaboradores Inativos (histórico — saíram ou foram desligados)'
+    classes = ('collapse',)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(ativo=False)
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Folha)
@@ -37,12 +69,18 @@ class FolhaAdmin(admin.ModelAdmin):
     list_display  = ('id', 'tomador', 'tipo', 'descricao', 'ativa', 'total_colaboradores')
     list_filter   = ('tipo', 'ativa', 'tomador')
     search_fields = ('tomador__nome', 'descricao')
-    inlines       = [ColaboradorInformalInline]
+    inlines       = [ColaboradorInformalInline, ColaboradorInformalInativoInline]
     fields        = ('tomador', 'tipo', 'descricao', 'fornecedor', 'empresa_pagadora', 'plano_de_contas', 'ativa')
 
     def total_colaboradores(self, obj):
         return obj.colaboradores.filter(ativo=True).count()
     total_colaboradores.short_description = 'Colaboradores ativos'
+
+    # Nota: não é preciso checar ItemPagamento manualmente aqui — o Django admin
+    # já impede a exclusão de ColaboradorInformal com pagamentos vinculados
+    # (colaborador é PROTECT em ItemPagamento) e mostra um erro de validação
+    # automaticamente antes de chegar em save_formset. Para excluir alguém que
+    # já recebeu algum pagamento, desmarque "Ativo" em vez de excluir.
 
 
 # ── Itens inline (dentro de PagamentoFolha) ──────────────────────────────────
