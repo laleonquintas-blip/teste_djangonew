@@ -1202,6 +1202,13 @@ class DespesaAdmin(admin.ModelAdmin):
             f'<th {th}>Diferença</th>'
             '</tr></thead><tbody>'
         )
+        estilo_largura = (
+            '<style>'
+            '.form-group.field-itens_folha_display .row > label.col-sm-3 { display: none !important; }'
+            '.form-group.field-itens_folha_display .row > div.col-sm-7 { '
+            'flex: 0 0 100% !important; max-width: 100% !important; }'
+            '</style>'
+        )
         estilo_impressao = (
             '<style>@media print {'
             'body * { visibility: hidden; }'
@@ -1210,7 +1217,7 @@ class DespesaAdmin(admin.ModelAdmin):
             '.no-print { display: none !important; }'
             '}</style>'
         )
-        return mark_safe(estilo_impressao + header + ''.join(rows) + '</tbody></table></div>')
+        return mark_safe(estilo_largura + estilo_impressao + header + ''.join(rows) + '</tbody></table></div>')
     itens_folha_display.short_description = ''
 
     valor_formatado.short_description = "Valor"
