@@ -3,6 +3,7 @@
 from django.contrib import admin
 from django.db.models import Sum, Count, Q
 from django.utils.safestring import mark_safe
+from django.utils.html import escape
 from django import forms
 from django.utils import timezone
 from django.contrib.auth.models import Group
@@ -1185,16 +1186,46 @@ class DespesaAdmin(admin.ModelAdmin):
         )
 
         th = 'style="padding:10px 16px;text-align:left;font-weight:600;letter-spacing:.03em;white-space:nowrap;"'
+        area_id = f'folha-print-area-{obj.pk}'
+        titulo_impressao = f'Folha — WF #{obj.pk}'
+        try:
+            titulo_impressao = f'{obj.pagamento_folha.folha} — WF #{obj.pk}'
+        except Exception:
+            pass
+        titulo_attr = escape(titulo_impressao)
+
+        # Toda a lógica fica no próprio onclick (via data-* + IIFE) porque uma
+        # tag <script> injetada em innerHTML de um campo readonly do admin não
+        # é executada pelo navegador — só atributos de evento como onclick são.
+        onclick_js = (
+            "(function(btn){"
+            "var conteudo=document.getElementById(btn.dataset.printTarget).innerHTML;"
+            "var titulo=btn.dataset.printTitle;"
+            "var w=window.open('','_blank');"
+            "var css='body{font-family:Arial,Helvetica,sans-serif;margin:20px;color:#212529;}'"
+            "+'table{border-collapse:collapse;width:100%;}'"
+            "+'h1{font-size:16px;margin-bottom:16px;}'"
+            "+'@media print{@page{size:landscape;margin:10mm;}}';"
+            "var html='<!doctype html><html><head><meta charset=\\'utf-8\\'><title>'+titulo+'</title>'"
+            "+'<style>'+css+'</style></head><body>'"
+            "+'<h1>'+titulo+'</h1>'+conteudo+'</body></html>';"
+            "w.document.write(html);"
+            "w.document.close();"
+            "w.focus();"
+            "setTimeout(function(){w.print();},300);"
+            "})(this)"
+        )
         botao_imprimir = (
             '<div class="no-print" style="text-align:right;margin-bottom:10px;">'
-            '<button type="button" onclick="window.print()" '
+            f'<button type="button" data-print-target="{area_id}" data-print-title="{titulo_attr}" '
+            f'onclick="{onclick_js}" '
             'style="background:#17a2b8;color:#fff;border:none;padding:8px 18px;'
             'border-radius:4px;font-weight:600;cursor:pointer;font-size:.85rem;">'
             '🖨 Imprimir Folha</button></div>'
         )
         header = (
             f'{botao_imprimir}'
-            '<div id="folha-print-area" style="overflow-x:auto;">'
+            f'<div id="{area_id}" style="overflow-x:auto;">'
             '<table style="width:100%;border-collapse:collapse;font-size:.88rem;table-layout:auto;">'
             f'<thead><tr style="background:#343a40;color:#fff;">'
             f'<th {th}>Filial</th><th {th}>Qt</th><th {th}>Nome</th><th {th}>CPF</th>'
@@ -1209,15 +1240,7 @@ class DespesaAdmin(admin.ModelAdmin):
             'flex: 0 0 100% !important; max-width: 100% !important; }'
             '</style>'
         )
-        estilo_impressao = (
-            '<style>@media print {'
-            'body * { visibility: hidden; }'
-            '#folha-print-area, #folha-print-area * { visibility: visible; }'
-            '#folha-print-area { position: absolute; top: 0; left: 0; width: 100%; }'
-            '.no-print { display: none !important; }'
-            '}</style>'
-        )
-        return mark_safe(estilo_largura + estilo_impressao + header + ''.join(rows) + '</tbody></table></div>')
+        return mark_safe(estilo_largura + header + ''.join(rows) + '</tbody></table></div>')
     itens_folha_display.short_description = ''
 
     valor_formatado.short_description = "Valor"
