@@ -54,8 +54,7 @@ class ColaboradorInformalInativoInline(admin.TabularInline):
     extra   = 0
     fields  = ('filial', 'qt', 'nome', 'cpf', 'registro', 'banco', 'agencia', 'conta', 'valor_padrao', 'ativo')
     ordering = ('banco', 'nome')
-    verbose_name_plural = 'Colaboradores Inativos (histórico — saíram ou foram desligados)'
-    classes = ('collapse',)
+    verbose_name_plural = 'Colaboradores Inativos'
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(ativo=False)
