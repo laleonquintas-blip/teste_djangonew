@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from cadastros.models import Tomador, Filial, Fornecedor, Banco, PlanoDeContas
+from cadastros.models import Tomador, Filial, Fornecedor, Banco, PlanoDeContas, validar_cpf
 from financeiro.models import Empresa
 
 User = get_user_model()
@@ -42,7 +42,7 @@ class ColaboradorInformal(models.Model):
     filial    = models.ForeignKey(Filial, on_delete=models.PROTECT, verbose_name='Filial')
     qt        = models.PositiveIntegerField(verbose_name='Qt')
     nome      = models.CharField(max_length=200, verbose_name='Nome')
-    cpf       = models.CharField(max_length=14, verbose_name='CPF')
+    cpf       = models.CharField(max_length=14, verbose_name='CPF', validators=[validar_cpf])
     registro  = models.BooleanField(default=False, verbose_name='Registro')
     banco     = models.CharField(max_length=100, verbose_name='Banco (depósito)')
     agencia   = models.CharField(max_length=20, verbose_name='Agência')
