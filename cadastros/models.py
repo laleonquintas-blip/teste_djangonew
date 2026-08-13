@@ -108,7 +108,7 @@ class ColaboradorInfo(models.Model):
         ('BANCO', 'Dados Bancários'),
     ]
     nome = models.CharField(max_length=200, verbose_name="Nome Completo")
-    cpf = models.CharField(max_length=20, verbose_name="CPF", validators=[validar_cpf])
+    cpf = models.CharField(max_length=20, unique=True, verbose_name="CPF", validators=[validar_cpf])
     tipo_pix = models.CharField(max_length=10, choices=TIPO_PIX_CHOICES, blank=True, verbose_name="Tipo de Chave")
     chave_pix = models.CharField(max_length=200, blank=True, verbose_name="Chave Pix / Dados Bancários")
     observacoes = models.TextField(blank=True, verbose_name="Observações")
