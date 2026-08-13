@@ -373,4 +373,7 @@ class PagamentoFolhaAdmin(admin.ModelAdmin):
                 )
         total = pagamento.itens.aggregate(s=Sum('valor_atual'))['s'] or 0
         PagamentoFolha.objects.filter(pk=pagamento.pk).update(total=total)
+        # .update() não sincroniza o objeto em memória — precisa atualizar aqui
+        # porque _criar_despesa_wf usa pagamento.total logo em seguida.
+        pagamento.total = total
 
