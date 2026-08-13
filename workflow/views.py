@@ -3,7 +3,7 @@ from collections import Counter
 from django.shortcuts import render
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Sum, F
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.utils import timezone as tz
 
 
@@ -137,8 +137,81 @@ def relatorio_coberturas(request):
         'colaborador_selecionado': colaborador_selecionado,
         'motivo_id': motivo_id,
         'motivo_selecionado': motivo_selecionado,
+        'querystring': request.GET.urlencode(),
     }
     return render(request, 'admin/workflow/relatorio_coberturas.html', context)
+
+
+@staff_member_required
+def exportar_coberturas_detalhado(request):
+    """
+    Exporta um CSV com uma linha por DIA de falta (não por WF), usando os
+    mesmos filtros da tela de Relatório de Coberturas — para rastrear as
+    faltas dia a dia em outro sistema.
+    """
+    import csv
+    from workflow.models import Despesa
+
+    DIAS_SEMANA = {
+        1: 'Domingo', 2: 'Segunda-feira', 3: 'Terça-feira', 4: 'Quarta-feira',
+        5: 'Quinta-feira', 6: 'Sexta-feira', 7: 'Sábado',
+    }
+
+    qs = Despesa.objects.filter(
+        status='PAGO',
+        fornecedor__plano_de_contas__nome='Cobertura Falta',
+    ).select_related('colaborador_faltou', 'colaborador_faltou__filial', 'motivo_ausencia')
+
+    data_inicio = request.GET.get('data_inicio', '')
+    data_fim = request.GET.get('data_fim', '')
+    colaborador_id = request.GET.get('colaborador', '')
+    motivo_id = request.GET.get('motivo', '')
+
+    if data_inicio:
+        qs = qs.filter(data_despesa__gte=data_inicio)
+    if data_fim:
+        qs = qs.filter(data_despesa__lte=data_fim)
+    if colaborador_id:
+        qs = qs.filter(colaborador_faltou__id=colaborador_id)
+    if motivo_id:
+        qs = qs.filter(motivo_ausencia__id=motivo_id)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = 'attachment; filename="coberturas_faltas_detalhado.csv"'
+
+    writer = csv.writer(response, delimiter=';')
+    writer.writerow([
+        'Data da Falta', 'Dia da Semana', 'Colaborador', 'Filial',
+        'Motivo', 'WF #', 'Valor da Ocorrência (WF)',
+    ])
+
+    for d in qs.order_by('data_despesa'):
+        datas = []
+        dias_cob = (d.dias_cobertura or '').strip()
+        if dias_cob:
+            for parte in dias_cob.split(','):
+                parte = parte.strip()
+                if not parte:
+                    continue
+                try:
+                    datas.append(datetime.strptime(parte, '%d-%m-%Y').date())
+                except ValueError:
+                    continue
+        elif d.data_despesa:
+            datas = [d.data_despesa]
+
+        colaborador = d.colaborador_faltou.nome if d.colaborador_faltou else ''
+        filial = d.colaborador_faltou.filial if (d.colaborador_faltou and d.colaborador_faltou.filial_id) else ''
+        motivo = d.motivo_ausencia.nome if d.motivo_ausencia else ''
+
+        for dt in sorted(datas):
+            nome_dia = DIAS_SEMANA[dt.isoweekday() % 7 + 1]
+            writer.writerow([
+                dt.strftime('%d/%m/%Y'), nome_dia, colaborador, filial,
+                motivo, d.id, f'{d.valor:.2f}'.replace('.', ','),
+            ])
+
+    return response
 
 
 @staff_member_required

@@ -131,6 +131,10 @@
                 <i class="fas fa-times"></i> Limpar tudo
             </a>
             {% endif %}
+            <a href="{% url 'exportar_coberturas_detalhado' %}{% if querystring %}?{{ querystring }}{% endif %}"
+               class="btn btn-success btn-sm" title="Uma linha por dia de falta — data exata, colaborador, filial e motivo">
+                <i class="fas fa-file-csv"></i> Exportar Detalhado (dias)
+            </a>
         </form>
     </div>
 
