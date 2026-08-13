@@ -1,6 +1,7 @@
 from django import forms as django_forms
 from django.contrib import admin, messages
 from django.http import HttpResponseRedirect
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from django.utils.html import format_html
 from django.db import models
@@ -320,6 +321,19 @@ class PagamentoFolhaAdmin(admin.ModelAdmin):
 
     def _criar_despesa_wf(self, request, pagamento):
         from workflow.models import Despesa, LogWorkflow
+
+        # Se já existe um WF vinculado (ex.: foi devolvido e voltou a RASCUNHO
+        # para correção), reabre o existente em vez de criar um duplicado.
+        # Acessar o OneToOne reverso quando não existe levanta exceção — não
+        # retorna None — por isso o try/except em vez de getattr(default=).
+        try:
+            despesa_existente = pagamento.despesa_wf
+        except ObjectDoesNotExist:
+            despesa_existente = None
+        if despesa_existente is not None:
+            self._reabrir_despesa_wf(request, pagamento, despesa_existente)
+            return
+
         folha = pagamento.folha
 
         if _in_group(request.user, 'Aprovador RH'):
@@ -356,6 +370,32 @@ class PagamentoFolhaAdmin(admin.ModelAdmin):
 
         pagamento.status = status_inicial
         PagamentoFolha.objects.filter(pk=pagamento.pk).update(status=status_inicial)
+
+    def _reabrir_despesa_wf(self, request, pagamento, despesa):
+        from workflow.models import LogWorkflow
+
+        if _in_group(request.user, 'Aprovador RH'):
+            status_novo = 'AGUARDANDO_FIN'
+            perfil = 'RH'
+            acao = 'Corrigido e reenviado / Aprovado RH automático'
+        else:
+            status_novo = 'AGUARDANDO_RH'
+            perfil = 'Solicitante'
+            acao = 'Corrigido e reenviado após devolução'
+
+        despesa.valor = pagamento.total
+        despesa.status = status_novo
+        despesa.save()
+
+        LogWorkflow.objects.create(
+            despesa        = despesa,
+            usuario        = request.user,
+            perfil_usuario = perfil,
+            acao           = acao,
+        )
+
+        pagamento.status = status_novo
+        PagamentoFolha.objects.filter(pk=pagamento.pk).update(status=status_novo)
 
     def _gerar_ou_atualizar_itens(self, pagamento):
         for colab in pagamento.folha.colaboradores.filter(ativo=True):

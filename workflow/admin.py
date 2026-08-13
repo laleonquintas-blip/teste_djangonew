@@ -772,6 +772,11 @@ class DespesaAdmin(admin.ModelAdmin):
             if obj.solicitante == user and obj_status in ['AGUARDANDO_COMERCIAL', 'AGUARDANDO_ADM']:
                 return True
 
+        # FOLHA devolvida (AGUARDANDO_ADM): o solicitante original pode reabrir e
+        # corrigir, independente do grupo — é ele quem tem o contexto da folha.
+        if obj_tipo == 'FOLHA' and obj_status == 'AGUARDANDO_ADM' and obj.solicitante == user:
+            return True
+
         # Administrativo: seus próprios ao AGUARDANDO_ADM + extras direcionados a ele
         if 'Administrativo' in grupos and obj_status == 'AGUARDANDO_ADM':
             if obj.solicitante == user:
@@ -945,6 +950,11 @@ class DespesaAdmin(admin.ModelAdmin):
             _mapa = {
                 'AGUARDANDO_RH':  'AGUARDANDO_RH',
                 'AGUARDANDO_FIN': 'AGUARDANDO_FIN',
+                # Devolvido ao Administrativo: volta a RASCUNHO para o solicitante
+                # poder editar os itens (ex.: adicionar colaborador faltante) e
+                # reenviar — sem isso o PagamentoFolha ficava travado no status
+                # antigo, dessincronizado do WF real.
+                'AGUARDANDO_ADM': 'RASCUNHO',
                 'PAGO':           'PAGA',
                 'CONFERIDO':      'PAGA',
                 'CANCELADO':      'CANCELADA',
