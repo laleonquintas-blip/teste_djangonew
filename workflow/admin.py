@@ -550,12 +550,12 @@ class DespesaAdmin(admin.ModelAdmin):
         if 'Aprovador Financeiro' in grupos or 'Operador' in grupos:
             return qs
 
-        # RH: seus próprios + solicitações/extras em AGUARDANDO_RH + já atuou
+        # RH: seus próprios + solicitações/extras/folhas em AGUARDANDO_RH + já atuou
         # Caixinhas de outros perfis nunca passam pelo RH
         if 'Aprovador RH' in grupos:
             return qs.filter(
                 Q(solicitante=user) |
-                Q(status='AGUARDANDO_RH', tipo_lancamento__in=['SOLICITACAO', 'EXTRA']) |
+                Q(status='AGUARDANDO_RH', tipo_lancamento__in=['SOLICITACAO', 'EXTRA', 'FOLHA']) |
                 Q(logs__usuario=user)
             ).distinct()
 
@@ -782,9 +782,9 @@ class DespesaAdmin(admin.ModelAdmin):
             except Exception:
                 pass
 
-        # RH: apenas SOLICITACAO e EXTRA em AGUARDANDO_RH (caixinha não passa pelo RH)
+        # RH: SOLICITACAO, EXTRA e FOLHA em AGUARDANDO_RH (caixinha não passa pelo RH)
         if 'Aprovador RH' in grupos and obj_status == 'AGUARDANDO_RH':
-            if obj_tipo in ['SOLICITACAO', 'EXTRA']:
+            if obj_tipo in ['SOLICITACAO', 'EXTRA', 'FOLHA']:
                 return True
 
         # Financeiro
