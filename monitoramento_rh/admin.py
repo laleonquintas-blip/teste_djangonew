@@ -272,6 +272,13 @@ class PagamentoFolhaAdmin(admin.ModelAdmin):
             instance.save()
         formset.save_m2m()
 
+        # Recalcula o total após as edições dos itens serem persistidas —
+        # save_model (que chama _gerar_ou_atualizar_itens) roda ANTES deste
+        # save_formset, então qualquer alteração de valor feita na tela só é
+        # refletida no total se recalcularmos aqui também.
+        if formset.instance and formset.instance.pk:
+            self._recalcular_total(formset.instance)
+
     def _pendentes_justificativa(self, obj):
         return list(
             obj.itens.filter(valor_anterior__isnull=False, justificativa='')
@@ -411,6 +418,13 @@ class PagamentoFolhaAdmin(admin.ModelAdmin):
                     valor_anterior=ultimo,
                     valor_atual=colab.valor_padrao,
                 )
+        self._recalcular_total(pagamento)
+
+    def _recalcular_total(self, pagamento):
+        """Soma os itens e atualiza o total — precisa ser chamado tanto ao
+        gerar itens quanto após o formset de itens ser salvo (save_formset),
+        já que edições de valor_atual feitas na tela só persistem depois que
+        save_model já rodou."""
         total = pagamento.itens.aggregate(s=Sum('valor_atual'))['s'] or 0
         PagamentoFolha.objects.filter(pk=pagamento.pk).update(total=total)
         # .update() não sincroniza o objeto em memória — precisa atualizar aqui
