@@ -714,6 +714,7 @@ class TransferenciaAdmin(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         from cadastros.models import Banco
+        from django.db.models import Sum
         extra = extra_context or {}
         extra['bancos_opts'] = list(Banco.objects.values_list('id', 'nome').order_by('nome'))
         extra['usuarios_opts'] = list(
@@ -721,7 +722,14 @@ class TransferenciaAdmin(admin.ModelAdmin):
             .values_list('criado_por__id', 'criado_por__username')
             .distinct().order_by('criado_por__username')
         )
-        return super().changelist_view(request, extra_context=extra)
+        response = super().changelist_view(request, extra_context=extra)
+        try:
+            qs = response.context_data['cl'].queryset
+            total = qs.aggregate(t=Sum('valor'))['t'] or 0
+            response.context_data['total_filtrado_fmt'] = fmt_brl(total)
+        except (AttributeError, KeyError):
+            pass
+        return response
 
     def save_model(self, request, obj, form, change):
         if not obj.pk:
