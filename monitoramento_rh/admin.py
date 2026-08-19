@@ -45,6 +45,9 @@ class ColaboradorInformalInline(admin.TabularInline):
     ordering = ('banco', 'nome')
     verbose_name_plural = 'Colaboradores Ativos'
 
+    class Media:
+        js = ('js/colaborador_informal_enter_nav.js',)
+
     def get_queryset(self, request):
         return super().get_queryset(request).filter(ativo=True)
 
