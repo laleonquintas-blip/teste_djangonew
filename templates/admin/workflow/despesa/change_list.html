@@ -86,6 +86,11 @@
             </select>
         </div>
 
+        <div class="cfb-field" style="flex:1;min-width:200px;">
+            <label>Colaborador que Faltou</label>
+            <input type="text" id="cfb_faltou" data-cfb-param="faltou_q" placeholder="Buscar por nome...">
+        </div>
+
         <div class="cfb-field" style="min-width:140px;">
             <label>Tipo</label>
             <select id="cfb_tipo" data-cfb-param="tipo_lancamento">
@@ -114,6 +119,7 @@
             sol_q:   cfbVal('cfb_sol'),
             desp_q:  cfbVal('cfb_desp'),
             filial_q: cfbVal('cfb_filial'),
+            faltou_q: cfbVal('cfb_faltou'),
             'data_criacao__range__gte': cfbVal('cfb_data_ini'),
             'data_criacao__range__lte': cfbVal('cfb_data_fim'),
             'data_ultima_alteracao__range__gte': cfbVal('cfb_alt_ini'),

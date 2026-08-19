@@ -57,6 +57,13 @@ class WfDespesaFilter(_WfTextFilter):
             return queryset.filter(fornecedor__razao_social__icontains=self.value())
 
 
+class WfColaboradorFaltouFilter(_WfTextFilter):
+    title = 'Colaborador que Faltou'; parameter_name = 'faltou_q'
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(colaborador_faltou__nome__icontains=self.value())
+
+
 class WfFilialFilter(_WfTextFilter):
     title = 'Filial'; parameter_name = 'filial_q'
     def queryset(self, request, queryset):
@@ -499,6 +506,7 @@ class DespesaAdmin(admin.ModelAdmin):
         WfSolicitanteFilter,
         WfDespesaFilter,
         WfFilialFilter,
+        WfColaboradorFaltouFilter,
     )
     search_fields = ('id', 'fornecedor__razao_social', 'solicitante__first_name')
 
