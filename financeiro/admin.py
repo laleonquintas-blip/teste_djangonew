@@ -940,12 +940,93 @@ class SaldoSupervisorAdmin(admin.ModelAdmin):
             )
             return HttpResponseRedirect(redirect_url)
 
+        if request.method == 'POST' and '_transferir_supervisor_btn' in request.POST and object_id:
+            obj = self.get_object(request, object_id)
+            redirect_url = reverse('admin:financeiro_saldosupervisor_change', args=[object_id])
+            if not obj or obj.status != 'ABERTO':
+                self.message_user(request, "Ciclo não está aberto.", level='error')
+                return HttpResponseRedirect(redirect_url)
+
+            destino_id = request.POST.get('supervisor_destino')
+            valor_str = request.POST.get('valor_transferencia_sup', '').strip().replace('.', '').replace(',', '.')
+            try:
+                valor = Decimal(valor_str or '0')
+            except InvalidOperation:
+                valor = Decimal('0')
+
+            if valor <= 0:
+                self.message_user(request, "Informe um valor válido para transferir.", level='error')
+                return HttpResponseRedirect(redirect_url)
+            if valor > obj.saldo:
+                self.message_user(
+                    request,
+                    f"Valor maior que o saldo disponível (R$ {fmt_brl(obj.saldo)}).",
+                    level='error',
+                )
+                return HttpResponseRedirect(redirect_url)
+
+            destino = UsuarioCustomizado.objects.filter(pk=destino_id).first()
+            if not destino:
+                self.message_user(request, "Selecione um supervisor de destino válido.", level='error')
+                return HttpResponseRedirect(redirect_url)
+            if destino.pk == obj.supervisor_id:
+                self.message_user(request, "Não é possível transferir para o mesmo supervisor.", level='error')
+                return HttpResponseRedirect(redirect_url)
+
+            with transaction.atomic():
+                nome_origem = obj.supervisor.first_name or obj.supervisor.username
+                nome_destino = destino.first_name or destino.username
+
+                MovimentacaoSupervisor.objects.create(
+                    saldo_supervisor=obj,
+                    tipo='DEBITO',
+                    valor=valor,
+                    descricao=f"Transferência para {nome_destino}",
+                )
+
+                # Credita no ciclo aberto do destino — cria um novo se ele não tiver nenhum
+                # (mesmo comportamento já usado quando uma Conta a Pagar credita um supervisor).
+                ciclo_destino = SaldoSupervisor.objects.filter(
+                    supervisor=destino, status='ABERTO'
+                ).order_by('-data_inicio').first()
+                if not ciclo_destino:
+                    ciclo_destino = SaldoSupervisor.objects.create(supervisor=destino)
+
+                # saldo_disponivel é quem controla o teto do saldo (a property
+                # `saldo` só deduz DÉBITOS de cima dele — um CREDITO isolado em
+                # MovimentacaoSupervisor não altera o saldo sozinho, precisa
+                # incrementar aqui também. F() evita race condition.
+                from django.db.models import F
+                SaldoSupervisor.objects.filter(pk=ciclo_destino.pk).update(
+                    saldo_disponivel=F('saldo_disponivel') + valor
+                )
+
+                MovimentacaoSupervisor.objects.create(
+                    saldo_supervisor=ciclo_destino,
+                    tipo='CREDITO',
+                    valor=valor,
+                    descricao=f"Transferência de {nome_origem}",
+                )
+
+            self.message_user(
+                request,
+                f"R$ {fmt_brl(valor)} transferido de {nome_origem} para {nome_destino} com sucesso.",
+            )
+            return HttpResponseRedirect(redirect_url)
+
         if object_id:
             from cadastros.models import Banco
             extra_context = extra_context or {}
             extra_context['bancos_opts'] = list(
                 Banco.objects.order_by('nome').values_list('id', 'nome')
             )
+            obj_atual = self.get_object(request, object_id)
+            supervisores_qs = UsuarioCustomizado.objects.filter(is_staff=True).order_by('first_name', 'username')
+            if obj_atual:
+                supervisores_qs = supervisores_qs.exclude(pk=obj_atual.supervisor_id)
+            extra_context['supervisores_opts'] = [
+                (u.id, u.first_name or u.username) for u in supervisores_qs
+            ]
         return super().changeform_view(request, object_id, form_url, extra_context)
 
     def fechar_ciclo(self, request, queryset):
