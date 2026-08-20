@@ -434,3 +434,15 @@ class PagamentoFolhaAdmin(admin.ModelAdmin):
         # porque _criar_despesa_wf usa pagamento.total logo em seguida.
         pagamento.total = total
 
+        # Mantém o WF vinculado sincronizado com o total, mesmo quando o
+        # pagamento NÃO está em RASCUNHO (ex.: item editado com o pagamento
+        # já em AGUARDANDO_FIN — o campo valor_atual permanece editável nesse
+        # status). Sem isso, o WF fica com o valor antigo, dessincronizado.
+        from workflow.models import Despesa
+        try:
+            despesa = pagamento.despesa_wf
+        except ObjectDoesNotExist:
+            despesa = None
+        if despesa is not None and despesa.valor != total:
+            Despesa.objects.filter(pk=despesa.pk).update(valor=total)
+
