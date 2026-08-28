@@ -20,7 +20,7 @@ def fmt_brl(valor):
     """Formata número no padrão BR: milhar com ponto, decimal com vírgula."""
     return '{:,.2f}'.format(float(valor)).replace(',', 'X').replace('.', ',').replace('X', '.')
 from .resources import ContasAPagarResource, ContasAReceberResource
-from cadastros.models import Cliente
+from cadastros.models import Cliente, Banco
 from django.contrib.auth.models import Group
 from core.models import UsuarioCustomizado
 
@@ -471,6 +471,15 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
                 groups=grupo_adm
             ).order_by('first_name', 'last_name')
             form.base_fields['supervisor'].empty_label = '— Nenhum —'
+        if 'banco' in form.base_fields:
+            # Só oferece bancos ativos (entra_no_saldo_geral=True) — bancos
+            # descontinuados (ex.: CAIXINHA) não devem mais ser escolhidos em
+            # novos lançamentos, mas o banco já salvo num registro existente
+            # continua disponível para não travar a edição.
+            bancos_ativos = Banco.objects.filter(entra_no_saldo_geral=True)
+            if obj and obj.banco_id and not bancos_ativos.filter(pk=obj.banco_id).exists():
+                bancos_ativos = bancos_ativos | Banco.objects.filter(pk=obj.banco_id)
+            form.base_fields['banco'].queryset = bancos_ativos.order_by('nome')
         return form
 
     def changelist_view(self, request, extra_context=None):
@@ -546,6 +555,18 @@ class ContasAReceberAdmin(ImportExportModelAdmin):
     readonly_fields = ('data_baixa', 'usuario_baixa')
     exclude = ('nota', 'escala_horas')
     actions = [marcar_como_pago, marcar_como_cancelado, marcar_como_pendente]
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if 'banco' in form.base_fields:
+            # Mesma regra do Contas a Pagar: só bancos ativos
+            # (entra_no_saldo_geral=True) entram como opção nova; o banco já
+            # salvo num registro existente continua disponível na edição.
+            bancos_ativos = Banco.objects.filter(entra_no_saldo_geral=True)
+            if obj and obj.banco_id and not bancos_ativos.filter(pk=obj.banco_id).exists():
+                bancos_ativos = bancos_ativos | Banco.objects.filter(pk=obj.banco_id)
+            form.base_fields['banco'].queryset = bancos_ativos.order_by('nome')
+        return form
 
     def changelist_view(self, request, extra_context=None):
         from django.db.models import Sum
