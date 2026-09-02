@@ -494,7 +494,7 @@ class DespesaAdmin(admin.ModelAdmin):
 
     baixar_e_limpar_comprovantes.short_description = "⬇ Baixar comprovantes e liberar espaço na nuvem"
 
-    list_display = ('id', 'data_criacao_display', 'tipo_badge', 'solicitante', 'despesa_display',
+    list_display = ('id', 'data_criacao_display', 'tipo_badge', 'solicitante', 'filial', 'despesa_display',
                     'valor_formatado', 'data_ultimo_status', 'hora_ultimo_status', 'status_badge', 'botao_detalhes')
     list_filter = (
         'tipo_lancamento',
