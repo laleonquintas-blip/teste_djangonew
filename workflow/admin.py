@@ -41,12 +41,21 @@ class WfSolicitanteFilter(_WfTextFilter):
     title = 'Solicitante'; parameter_name = 'sol_q'
     def queryset(self, request, queryset):
         if self.value():
-            return queryset.filter(
-                solicitante__first_name__icontains=self.value()
-            ) | queryset.filter(
-                solicitante__last_name__icontains=self.value()
-            ) | queryset.filter(
-                solicitante__username__icontains=self.value()
+            # A barra de busca manda "Nome Sobrenome" (o <select> do
+            # solicitante concatena first_name + last_name) — comparar cada
+            # campo separado contra o texto inteiro nunca bate, por isso
+            # também comparamos contra o nome completo concatenado.
+            from django.db.models import Value
+            from django.db.models.functions import Concat
+            return queryset.annotate(
+                _solicitante_nome_completo=Concat(
+                    'solicitante__first_name', Value(' '), 'solicitante__last_name'
+                )
+            ).filter(
+                Q(_solicitante_nome_completo__icontains=self.value()) |
+                Q(solicitante__first_name__icontains=self.value()) |
+                Q(solicitante__last_name__icontains=self.value()) |
+                Q(solicitante__username__icontains=self.value())
             )
 
 
