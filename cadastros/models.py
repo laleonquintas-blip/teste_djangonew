@@ -27,6 +27,12 @@ class Banco(models.Model):
         verbose_name="Entra no Saldo Geral",
         help_text="Se desmarcado, a conta continua ativa no sistema mas não soma no card de Saldo Geral do dashboard."
     )
+    disponivel_para_movimentacao = models.BooleanField(
+        default=True,
+        verbose_name="Disponível para Movimentação",
+        help_text="Se desmarcado, a conta não aparece mais como opção ao criar novas Contas a Pagar/Receber. "
+                   "Independente de 'Entra no Saldo Geral' — dá pra esconder do dashboard sem tirar da movimentação, e vice-versa."
+    )
 
     def __str__(self):
         return self.nome

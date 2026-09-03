@@ -472,11 +472,12 @@ class ContasAPagarAdmin(ImportExportModelAdmin):
             ).order_by('first_name', 'last_name')
             form.base_fields['supervisor'].empty_label = '— Nenhum —'
         if 'banco' in form.base_fields:
-            # Só oferece bancos ativos (entra_no_saldo_geral=True) — bancos
+            # Só oferece bancos disponíveis para movimentação — bancos
             # descontinuados (ex.: CAIXINHA) não devem mais ser escolhidos em
             # novos lançamentos, mas o banco já salvo num registro existente
-            # continua disponível para não travar a edição.
-            bancos_ativos = Banco.objects.filter(entra_no_saldo_geral=True)
+            # continua disponível para não travar a edição. Independente de
+            # "Entra no Saldo Geral" (esse controla só o Dashboard).
+            bancos_ativos = Banco.objects.filter(disponivel_para_movimentacao=True)
             if obj and obj.banco_id and not bancos_ativos.filter(pk=obj.banco_id).exists():
                 bancos_ativos = bancos_ativos | Banco.objects.filter(pk=obj.banco_id)
             form.base_fields['banco'].queryset = bancos_ativos.order_by('nome')
@@ -559,10 +560,10 @@ class ContasAReceberAdmin(ImportExportModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
         if 'banco' in form.base_fields:
-            # Mesma regra do Contas a Pagar: só bancos ativos
-            # (entra_no_saldo_geral=True) entram como opção nova; o banco já
-            # salvo num registro existente continua disponível na edição.
-            bancos_ativos = Banco.objects.filter(entra_no_saldo_geral=True)
+            # Mesma regra do Contas a Pagar: só bancos disponíveis para
+            # movimentação entram como opção nova; o banco já salvo num
+            # registro existente continua disponível na edição.
+            bancos_ativos = Banco.objects.filter(disponivel_para_movimentacao=True)
             if obj and obj.banco_id and not bancos_ativos.filter(pk=obj.banco_id).exists():
                 bancos_ativos = bancos_ativos | Banco.objects.filter(pk=obj.banco_id)
             form.base_fields['banco'].queryset = bancos_ativos.order_by('nome')

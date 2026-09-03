@@ -138,9 +138,10 @@ class ColaboradorInfoAdmin(admin.ModelAdmin):
 admin.site.register(ColaboradorInfo, ColaboradorInfoAdmin)
 
 class BancoAdmin(admin.ModelAdmin):
-    list_display = ('id', 'nome', 'saldo_inicial', 'entra_no_saldo_geral', 'ultima_alteracao_display')
-    list_editable = ('entra_no_saldo_geral',)
-    list_filter = ('entra_no_saldo_geral',)
+    list_display = ('id', 'nome', 'saldo_inicial', 'entra_no_saldo_geral',
+                     'disponivel_para_movimentacao', 'ultima_alteracao_display')
+    list_editable = ('entra_no_saldo_geral', 'disponivel_para_movimentacao')
+    list_filter = ('entra_no_saldo_geral', 'disponivel_para_movimentacao')
     search_fields = ('nome',)
 
     def ultima_alteracao_display(self, obj):
